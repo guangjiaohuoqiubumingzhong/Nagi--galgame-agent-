@@ -230,3 +230,6 @@ scripts/verify_portable.py
 docs/review-pack/README.md
 docs/product/qlie-translation/segments-v1.schema.json
 scripts/audit_yuris_run.py
+.github/workflows/publish-portable.yml
+release/publish-request.json
+release/notes-0.1.0.md

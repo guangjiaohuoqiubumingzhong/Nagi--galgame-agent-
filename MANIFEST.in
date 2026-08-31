@@ -3,7 +3,7 @@ include *.ps1 *.cmd *.vbs .env.example .gitignore .gitattributes
 recursive-include nagi *.py *.html *.css *.js *.svg *.ps1
 recursive-include docs *.md *.json
 recursive-include requirements *.lock
-recursive-include release *.json *.txt
+recursive-include release *.json *.txt *.md
 recursive-include scripts *.py *.ps1
 recursive-include tests *.py *.cjs *.md *.txt *.json *.jsonl *.ks *.s
 recursive-include benchmarks *.json

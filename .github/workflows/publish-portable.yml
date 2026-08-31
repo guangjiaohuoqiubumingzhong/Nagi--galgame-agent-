@@ -1,0 +1,91 @@
+name: Publish Nagi portable
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [release/publish-request.json]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nagi-portable-publication
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate requested release version
+        id: version
+        shell: python
+        run: |
+          import ast, json, os, pathlib, re
+          module = ast.parse(pathlib.Path('nagi/__init__.py').read_text(encoding='utf-8'))
+          version = next(ast.literal_eval(node.value) for node in module.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == '__version__' for target in node.targets))
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+          request = json.loads(pathlib.Path('release/publish-request.json').read_text(encoding='utf-8'))
+          assert request['version'] == version and request['publish'] is True
+          assert pathlib.Path(f'release/notes-{version}.md').is_file()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write(f'version={version}\n')
+      - name: Install locked build and runtime dependencies
+        run: python -m pip install --require-hashes -r requirements/dev.lock -r requirements/portable.lock
+      - name: Run offline regression suite
+        run: python -m pytest tests -q
+      - name: Check frontend behavior
+        run: node --test tests/test_composer_commands.cjs
+      - name: Build source and portable packages
+        run: python scripts/build_release.py --portable
+      - name: Verify relocated portable package
+        run: python scripts/verify_portable.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nagi-public-release-files
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.build.outputs.version }}
+      SOURCE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nagi-public-release-files
+          path: dist
+      - name: Refuse to replace an existing release
+        run: |
+          gh release list --limit 1000 --json tagName > existing-releases.json
+          python -c 'import json,os; tag="v"+os.environ["RELEASE_VERSION"]; assert all(r["tagName"] != tag for r in json.load(open("existing-releases.json"))), "Release already exists; review it manually instead of overwriting it"'
+      - name: Verify local artifact checksums
+        working-directory: dist
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Upload a draft from this verified commit
+        run: |
+          gh release create "v${RELEASE_VERSION}" dist/* --draft --target "$SOURCE_COMMIT" --title "Nagi ${RELEASE_VERSION}" --notes-file "release/notes-${RELEASE_VERSION}.md"
+      - name: Download and verify every uploaded asset
+        run: |
+          gh release download "v${RELEASE_VERSION}" --dir verified-assets
+          cd verified-assets
+          sha256sum --check ../dist/SHA256SUMS.txt
+          cmp SHA256SUMS.txt ../dist/SHA256SUMS.txt
+      - name: Publish the verified portable release
+        run: gh release edit "v${RELEASE_VERSION}" --draft=false --latest
