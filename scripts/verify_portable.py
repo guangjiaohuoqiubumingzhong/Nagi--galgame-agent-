@@ -58,4 +58,5 @@ finally:
     subprocess.run([*command, '-Stop'], cwd=destination, env=env, check=True, timeout=20)
 result['checks'].append('PowerShell stop')
 (root / '.nagi-build/portable-smoke.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-print(json.dumps(result, ensure_ascii=False, indent=2))
+# CI output can use a legacy Windows code page; keep the saved report UTF-8.
+print(json.dumps(result, ensure_ascii=True, indent=2))
