@@ -1,0 +1,213 @@
+{
+  "$id": "https://nagi.local/schemas/game-text-segment-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "inlineToken": {
+      "additionalProperties": false,
+      "properties": {
+        "char_end": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "char_start": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        },
+        "raw": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "raw",
+        "char_start",
+        "char_end"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "byte_end": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "byte_start": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "conflict_group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "encoding": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "engine": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "entry_index": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "internal_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "line_end": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "output_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_size_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "engine",
+        "archive_name",
+        "internal_path",
+        "output_path",
+        "entry_index",
+        "conflict_group",
+        "source_sha256",
+        "source_size_bytes",
+        "encoding",
+        "byte_start",
+        "byte_end",
+        "line_start",
+        "line_end"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "One line of a Nagi segments.jsonl file. Byte spans are zero-based half-open; line spans are one-based inclusive.",
+  "properties": {
+    "kind": {
+      "enum": [
+        "dialogue",
+        "narration",
+        "choice",
+        "speaker_name",
+        "label",
+        "control",
+        "comment",
+        "metadata",
+        "unknown"
+      ]
+    },
+    "next_segment_id": {
+      "pattern": "^seg_v1_[0-9a-f]{64}$",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "normalized_text": {
+      "type": "string"
+    },
+    "placeholders": {
+      "items": {
+        "$ref": "#/definitions/inlineToken"
+      },
+      "type": "array"
+    },
+    "previous_segment_id": {
+      "pattern": "^seg_v1_[0-9a-f]{64}$",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scene": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "segment_id": {
+      "pattern": "^seg_v1_[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/definitions/source"
+    },
+    "source_text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_text_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "speaker": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "items": {
+        "$ref": "#/definitions/inlineToken"
+      },
+      "type": "array"
+    },
+    "translatable": {
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "segment_id",
+    "kind",
+    "translatable",
+    "source_text",
+    "normalized_text",
+    "source_text_sha256",
+    "speaker",
+    "scene",
+    "placeholders",
+    "tags",
+    "previous_segment_id",
+    "next_segment_id",
+    "source",
+    "warnings"
+  ],
+  "title": "Nagi Game Text Segment v1",
+  "type": "object"
+}

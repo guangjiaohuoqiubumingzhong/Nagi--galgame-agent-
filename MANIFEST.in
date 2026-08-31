@@ -1,0 +1,18 @@
+include LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md CONTRIBUTING.md uv.lock
+include *.ps1 *.cmd *.vbs .env.example .gitignore .gitattributes
+recursive-include nagi *.py *.html *.css *.js *.svg *.ps1
+recursive-include docs *.md *.json
+recursive-include requirements *.lock
+recursive-include release *.json *.txt
+recursive-include scripts *.py *.ps1
+recursive-include tests *.py *.cjs *.md *.txt *.json *.jsonl *.ks *.s
+recursive-include benchmarks *.json
+recursive-include examples *.py *.toml *.json *.md
+recursive-include .github *.yml *.md
+global-exclude *.pyc *.png *.log
+include nagi/web_ui/nagi-avatar.png
+prune .codex
+prune .pico
+prune .nagi
+prune .venv
+prune .nagi-build

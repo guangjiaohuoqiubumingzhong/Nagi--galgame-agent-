@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nagi Agent 工作台</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="工作区与会话">
+      <div class="brand-row">
+        <button id="brand-new-session" class="brand" type="button" aria-label="新建会话">
+          <span class="brand-mark" aria-hidden="true"><img class="nagi-avatar" src="/nagi-avatar.png" alt="" /></span>
+          <span class="brand-name">Nagi <b>AGENT</b></span>
+        </button>
+        <button id="sidebar-toggle" class="icon-button sidebar-toggle" type="button" aria-label="收起侧栏" aria-expanded="true">
+          <span class="rail-mark" aria-hidden="true"><img class="nagi-avatar" src="/nagi-avatar.png" alt="" /></span>
+          <svg class="panel-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+        </button>
+      </div>
+      <button id="new-session" class="new-session" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg>
+        <span class="new-session-label">新会话</span>
+      </button>
+      <div class="workspace-rail-controls" aria-label="工作区快捷操作">
+        <button id="workspace-search-rail" class="rail-button" type="button" aria-label="搜索工作区"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 4.3 4.3"/></svg></button>
+        <button id="add-workspace-rail" class="rail-button" type="button" aria-label="添加工作区"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h6l1.8 2H20v9.5H4z"/><path d="M16 3.5v7M12.5 7h7"/></svg></button>
+      </div>
+      <div id="workspace-heading" class="sidebar-section-heading">
+        <div class="workspace-heading-default">
+          <span class="workspace-heading-title">工作区</span>
+          <div class="workspace-heading-actions">
+            <button id="workspace-search" class="icon-button" type="button" aria-label="搜索工作区"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.2"/><path d="m16 16 4.4 4.4"/></svg></button>
+            <div class="view-options-wrap">
+              <button id="workspace-options" class="icon-button" type="button" aria-label="工作区显示选项" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="11" cy="17" r="1.6"/></svg></button>
+              <div id="workspace-options-menu" class="view-options-menu" role="menu" hidden>
+                <div class="menu-caption">分组方式</div>
+                <button type="button" data-group-mode="workspace" aria-checked="true"><span>按工作区</span><b>✓</b></button>
+                <button type="button" data-group-mode="flat" aria-checked="false"><span>单一列表</span><b>✓</b></button>
+                <div class="menu-separator"></div>
+                <div class="menu-caption">排序方式</div>
+                <button type="button" data-sort-mode="manual" aria-checked="true"><span>手动排序</span><b>✓</b></button>
+                <button type="button" data-sort-mode="updated" aria-checked="false"><span>最近更新</span><b>✓</b></button>
+              </div>
+            </div>
+            <button id="add-workspace" class="icon-button" type="button" aria-label="添加工作区"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+        </div>
+        <div class="workspace-search-box" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.2"/><path d="m16 16 4.4 4.4"/></svg>
+          <input id="workspace-search-input" type="search" autocomplete="off" placeholder="搜索工作区和会话" aria-label="搜索工作区和会话" />
+          <button id="workspace-search-close" type="button" aria-label="关闭搜索">×</button>
+        </div>
+      </div>
+      <nav id="workspace-list" class="workspace-list" aria-label="工作区列表">
+        <div class="sidebar-loading">正在读取工作区…</div>
+      </nav>
+      <div class="sidebar-nav">
+        <button class="side-nav-item active" data-view="agent"><span>⌁</span> Agent 对话</button>
+        <button class="side-nav-item" data-view="translation"><span>文</span> 视觉小说翻译</button>
+      </div>
+      <div class="sidebar-footer">
+        <button id="settings-button" class="settings-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 3.7 10.2 2h3.6l.6 1.7 1.5.6 1.6-.8 2.5 2.5-.8 1.6.6 1.5 1.7.6v3.6l-1.7.6-.6 1.5.8 1.6-2.5 2.5-1.6-.8-1.5.6-.6 1.7h-3.6l-.6-1.7-1.5-.6-1.6.8-2.5-2.5.8-1.6-.6-1.5-1.7-.6V9.7l1.7-.6.6-1.5-.8-1.6 2.5-2.5 1.6.8z"/><circle cx="12" cy="11.5" r="3"/></svg><span>设置</span></button>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <section id="agent-view" class="product-view">
+        <header class="topbar">
+          <div><div class="eyebrow">NAGI WORKSPACE</div><h1 id="session-title">新会话</h1></div>
+          <div class="topbar-actions">
+            <button id="stop-agent" class="secondary-button" hidden>停止任务</button>
+          </div>
+        </header>
+        <div class="agent-content">
+          <section id="conversation-pane" class="conversation-pane" aria-live="polite">
+            <div id="empty-state" class="empty-state">
+              <div class="empty-symbol"><img class="nagi-avatar" src="/nagi-avatar.png" alt="" /></div>
+              <h2>使用Nagi开始工作</h2>
+              <p class="empty-greeting">Ciallo～(∠・ω&lt; )⌒★</p>
+            </div>
+            <div id="message-list" class="message-list"></div>
+          </section>
+          <section id="approval-card" class="approval-card" hidden>
+            <div class="approval-icon">!</div>
+            <div class="approval-copy">
+              <span>需要你的批准</span><strong id="approval-tool">工具操作</strong><pre id="approval-args"></pre>
+            </div>
+            <div class="approval-actions">
+              <button id="deny-approval" class="secondary-button">拒绝</button>
+              <button id="allow-approval" class="primary-button">批准执行</button>
+            </div>
+          </section>
+        </div>
+        <footer class="composer-wrap">
+          <div id="session-controls" class="session-controls" hidden>
+            <button id="plan-mode-badge" class="session-control-chip" type="button" title="退出规划模式" hidden>规划模式 · 退出</button>
+            <button id="goal-badge" class="session-control-chip" type="button" hidden></button>
+          </div>
+          <div class="composer">
+            <div id="command-menu" class="command-menu" role="listbox" aria-label="命令" hidden></div>
+            <textarea id="prompt-input" rows="2" placeholder="向 Nagi 描述任务，Enter 发送，Shift+Enter 换行"></textarea>
+            <div class="composer-controls">
+              <div class="composer-left">
+                <button id="composer-add" class="round-button" type="button" aria-label="命令" title="命令（/）" aria-haspopup="listbox" aria-controls="command-menu" aria-expanded="false" disabled>＋</button>
+                <div class="permission-picker">
+                  <input id="approval-policy" type="hidden" value="ask" />
+                  <button id="permission-trigger" class="permission-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+                    <svg id="permission-current-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.8 6v5.1c0 4.7 3 8.1 7.2 9.9 4.2-1.8 7.2-5.2 7.2-9.9V6L12 3Z"/><path d="m9.2 12 1.8 1.8 3.8-4"/></svg>
+                    <span id="permission-label">每次询问</span>
+                  </button>
+                  <div id="permission-menu" class="permission-menu" role="menu" hidden>
+                    <button type="button" role="menuitemradio" aria-checked="false" data-policy="never">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.8 6v5.1c0 4.7 3 8.1 7.2 9.9 4.2-1.8 7.2-5.2 7.2-9.9V6L12 3Z"/><path d="M8.5 12h7"/></svg>
+                      <span>只读模式</span><b>✓</b>
+                    </button>
+                    <button type="button" role="menuitemradio" aria-checked="true" data-policy="ask">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.8 6v5.1c0 4.7 3 8.1 7.2 9.9 4.2-1.8 7.2-5.2 7.2-9.9V6L12 3Z"/><path d="M12 8.2v4.1M12 16h.01"/></svg>
+                      <span>每次询问</span><b>✓</b>
+                    </button>
+                    <button type="button" role="menuitemradio" aria-checked="false" data-policy="auto">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.8 6v5.1c0 4.7 3 8.1 7.2 9.9 4.2-1.8 7.2-5.2 7.2-9.9V6L12 3Z"/><path d="m9.2 12 1.8 1.8 3.8-4"/></svg>
+                      <span>自动批准</span><b>✓</b>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="composer-right"><button id="model-name" class="model-name" type="button" title="选择模型" aria-haspopup="dialog">DeepSeek</button><button id="send-button" class="send-button" aria-label="发送消息"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20V4M5 11l7-7 7 7"/></svg></button></div>
+            </div>
+          </div>
+          <div id="run-metrics" class="run-metrics">本地会话 · 工具调用受审批保护 · 密钥不会发送到前端</div>
+        </footer>
+      </section>
+
+      <section id="translation-view" class="product-view" hidden>
+        <header class="topbar translation-topbar">
+          <div><div class="eyebrow">GAME LOCALIZATION</div><h1>游戏翻译工作流</h1><p class="workflow-subtitle">从提取原文到游戏内中文，按步骤完成，每一步都可检查结果。</p></div>
+          <span id="game-status" class="status-pill">准备开始</span>
+        </header>
+        <div class="translation-layout">
+          <section id="extract-card" class="workflow-card panel" aria-labelledby="extract-heading">
+            <div class="workflow-card-heading"><span class="step-number">01</span><span id="extract-status" class="status-pill">待开始</span></div>
+            <h2 id="extract-heading">提取游戏资源</h2>
+            <p class="step-description">选择原始游戏和保存位置，提取脚本及后续翻译所需的语料。</p>
+            <div class="step-fields">
+              <label class="field-label" for="game-path">原始游戏目录</label>
+              <div class="path-row"><input id="game-path" placeholder="选择包含游戏主程序的文件夹" autocomplete="off" /><button id="browse-button" class="secondary-button">选择</button></div>
+              <label class="field-label path-label" for="storage-path">文本保存目录</label>
+              <div class="path-row"><input id="storage-path" placeholder="选择原文和 API 译文的保存位置" autocomplete="off" /><button id="browse-storage-button" class="secondary-button">选择</button></div>
+              <div class="workflow-artifact"><span class="artifact-symbol" aria-hidden="true">文</span><div><b>提取后的工作资料</b><span>原文脚本 · 文本片段 · 来源与结构信息</span></div></div>
+              <p class="field-hint">当前支持 QLIE 和 YU-RIS 479 文本提取；其他引擎需另行适配。</p>
+              <div id="extract-result" class="step-result" hidden></div>
+            </div>
+            <div class="step-footer">
+              <div class="stage-progress-label"><span id="extract-message">选择两个目录后即可提取</span><b id="extract-percent">0%</b></div>
+              <div id="extract-progress" class="progress-track" role="progressbar" aria-label="提取进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p id="extract-error" class="notice error" role="alert" hidden></p>
+              <button id="extract-button" class="translation-start"><strong>提取资源</strong><span aria-hidden="true">→</span></button>
+              <button id="reuse-trial-button" class="secondary-button full-width" hidden>复用旧开场试译快照</button>
+              <button id="extract-stop" class="secondary-button full-width" hidden>安全停止</button>
+            </div>
+          </section>
+          <section id="translate-card" class="workflow-card panel" aria-labelledby="translate-heading">
+            <div class="workflow-card-heading"><span class="step-number">02</span><span id="translate-status" class="status-pill">等待提取</span></div>
+            <h2 id="translate-heading">开始翻译</h2>
+            <p id="translation-description" class="step-description">全部已提取文本分批提交所选 API。</p>
+            <div class="info-grid">
+              <div><span>当前模型</span><strong id="translation-model">读取配置中</strong></div>
+              <div><span>目标语言</span><strong>简体中文</strong></div>
+            </div>
+            <fieldset class="mode-fieldset">
+              <legend>翻译范围</legend>
+              <label><input type="radio" name="mode" value="partial" /><span><b>部分翻译</b><small>仅翻译开场剧情前 50 条内容</small></span></label>
+              <label><input type="radio" name="mode" value="full" checked /><span><b>全文翻译</b><small>翻译全部语料，耗时与费用更高</small></span></label>
+            </fieldset>
+            <details id="translation-rag-details" class="rag-details"><summary>自动构建翻译上下文</summary><p id="translation-rag-status">仅召回相关前文，无需手动导入参考文件。</p></details>
+            <label class="cost-confirm"><input id="cost-confirm" type="checkbox" /><span>我了解翻译会调用所选模型的 API，并产生费用。</span></label>
+            <div id="translate-result" class="step-result" hidden></div>
+            <div class="step-footer">
+              <div class="stage-progress-label"><span id="translate-message">请先完成资源提取</span><b id="translate-percent">0%</b></div>
+              <div id="translate-progress" class="progress-track" role="progressbar" aria-label="翻译进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p id="translate-error" class="notice error" role="alert" hidden></p>
+              <button id="start-button" class="translation-start"><strong>开始翻译</strong><span aria-hidden="true">→</span></button>
+              <button id="stop-button" class="secondary-button full-width" hidden>安全停止</button>
+            </div>
+          </section>
+          <section id="deploy-card" class="workflow-card panel" aria-labelledby="deploy-heading">
+            <div class="workflow-card-heading"><span class="step-number">03</span><span id="deploy-status" class="status-pill">等待翻译</span></div>
+            <h2 id="deploy-heading">嵌入游戏内</h2>
+            <p class="step-description">将本次 API 返回的译文部署到独立游戏副本，生成汉化启动入口。</p>
+            <div class="launcher-preview"><span class="launcher-icon" aria-hidden="true">▶<small>中</small></span><b>独立汉化启动文件</b><span>部署成功后，从新入口游玩汉化版</span></div>
+            <ul class="deployment-checks"><li><span>原始游戏和存档</span><b>保持不变</b></li><li><span>部署位置</span><b>独立 playable 目录</b></li><li><span>资源加载与中文字体</span><b>按引擎适配</b></li></ul>
+            <div class="step-fields">
+              <label class="field-label" for="locale-path">本地 Locale Emulator 目录</label>
+              <div class="path-row"><input id="locale-path" placeholder="选择包含 LEProc.exe 和配套 DLL 的文件夹" autocomplete="off" /><button id="browse-locale-button" class="secondary-button" type="button">选择</button></div>
+              <button id="save-locale-button" class="secondary-button full-width" type="button">检查并保存目录</button>
+              <p id="locale-error" class="notice error" role="alert" hidden></p>
+            </div>
+            <div id="deploy-result" class="step-result" hidden></div>
+            <button id="copy-launcher-button" class="secondary-button full-width" hidden>复制启动文件路径</button>
+            <div class="step-footer">
+              <div class="stage-progress-label"><span id="deploy-message">请先完成翻译</span><b id="deploy-percent">0%</b></div>
+              <div id="deploy-progress" class="progress-track" role="progressbar" aria-label="嵌入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p id="deploy-error" class="notice error" role="alert" hidden></p>
+              <button id="deploy-button" class="translation-start"><strong>生成汉化启动文件</strong><span aria-hidden="true">↗</span></button>
+            </div>
+          </section>
+          <details class="workflow-log panel"><summary>运行记录 <span id="workflow-log-summary">尚未开始 · 原始游戏保持不变</span></summary><div id="event-log" class="event-log"><p>执行记录会显示在这里。</p></div></details>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="workspace-dialog" class="dialog-backdrop" hidden>
+    <section class="workspace-dialog" role="dialog" aria-modal="true" aria-labelledby="workspace-dialog-title">
+      <h2 id="workspace-dialog-title">重命名工作区</h2>
+      <p id="workspace-dialog-description"></p>
+      <input id="workspace-dialog-input" type="text" maxlength="80" autocomplete="off" />
+      <div class="dialog-actions">
+        <button id="workspace-dialog-cancel" class="secondary-button" type="button">取消</button>
+        <button id="workspace-dialog-confirm" class="primary-button" type="button">保存</button>
+      </div>
+    </section>
+  </div>
+  <dialog id="goal-dialog" class="goal-dialog" aria-labelledby="goal-dialog-title">
+    <form id="goal-form">
+      <div class="goal-dialog-heading"><h2 id="goal-dialog-title">长任务目标</h2><button id="goal-close" class="icon-button" type="button" aria-label="关闭目标设置">×</button></div>
+      <p id="goal-status" class="goal-status" role="status">尚未设置目标</p>
+      <label for="goal-objective">目标与完成标准</label>
+      <textarea id="goal-objective" rows="5" maxlength="4000" placeholder="说明你要完成什么，以及怎样才算完成。" required></textarea>
+      <label for="goal-rounds">累计轮次上限</label>
+      <input id="goal-rounds" type="number" min="1" max="50" step="1" value="5" required />
+      <p class="goal-help">开始后 Nagi 会在本机连续推进，直到完成、需要你的帮助或达到上限。每轮可能包含多次模型调用，会产生 API 费用；工具操作仍遵循你选择的权限。</p>
+      <p id="goal-error" class="goal-error" role="alert" hidden></p>
+      <div class="dialog-actions goal-actions">
+        <button id="goal-clear" class="danger-button" type="button">清除目标</button>
+        <button id="goal-pause" class="secondary-button" type="button">暂停</button>
+        <button id="goal-resume" class="secondary-button" type="button">继续目标</button>
+        <button id="goal-save" class="primary-button" type="submit">创建并开始</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="settings-dialog" class="model-settings-dialog" aria-labelledby="settings-title">
+    <header class="settings-header"><h2 id="settings-title">设置</h2><button id="settings-close" class="icon-button" type="button" aria-label="关闭设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <div class="settings-layout">
+      <nav class="settings-nav" aria-label="设置分类">
+        <button id="settings-general-tab" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3z"/><circle cx="12" cy="12" r="3"/></svg>通用设置</button>
+        <button id="settings-models-tab" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="11" cy="5" rx="7" ry="3"/><path d="M4 5v12c0 2 3 3 7 3M18 5v6M4 11c0 2 3 3 7 3"/><circle cx="17" cy="17" r="3"/><path d="M17 12v2m0 6v2m-5-5h2m6 0h2"/></svg>模型</button>
+      </nav>
+      <main class="settings-content">
+        <p id="settings-feedback" class="settings-feedback" role="status" aria-live="polite" hidden></p>
+        <section id="settings-general" hidden>
+          <h3>通用设置</h3><p class="settings-intro">Nagi 在本机运行，工作区和会话保存在本地。</p>
+          <div class="settings-info-row"><span>本机服务</span><span class="settings-connection"><span id="connection-dot" class="connection-dot"></span><span id="connection-text">连接本机服务…</span></span></div>
+          <div class="settings-info-row"><span>默认模型</span><span id="settings-default-model">未选择模型</span></div>
+          <div class="settings-info-row"><span>新增密钥存储</span><span id="settings-key-storage">本机保存</span></div>
+          <p class="settings-help">模型设置对 Agent 对话和游戏翻译生效。已启动的任务继续使用启动时的模型；切换不会修改原有对话内容。</p>
+        </section>
+        <section id="settings-models">
+          <div id="provider-overview">
+            <h3>模型</h3><p class="settings-intro">填入各提供方的 API 密钥即可使用其模型。</p>
+            <div id="provider-list" class="provider-list"></div>
+            <div class="provider-add-actions"><button id="provider-add" type="button"><span aria-hidden="true">＋</span> 添加提供方</button><button id="provider-add-custom" type="button"><span aria-hidden="true">＋</span> 添加自定义提供方</button></div>
+            <p class="settings-help">绿色圆点表示已配置密钥，不代表已经测试连通。模型可在卡片中选择，也可通过“编辑”填写其他模型 ID。</p>
+          </div>
+          <div id="provider-picker" hidden><button id="provider-picker-back" class="settings-back" type="button">← 返回模型</button><h3>添加提供方</h3><p class="settings-intro">选择提供方后，填写你自己的 API 密钥。</p><div id="provider-presets" class="provider-presets"></div></div>
+          <form id="provider-editor" hidden autocomplete="off">
+            <button id="provider-editor-back" class="settings-back" type="button">← 返回模型</button><h3 id="provider-editor-title">编辑提供方</h3>
+            <p class="settings-intro">保存仅写入本机；测试连接会发送一次短请求，可能产生少量费用。</p>
+            <label for="provider-name">显示名称</label><input id="provider-name" type="text" maxlength="80" required />
+            <label for="provider-base">API 基础地址</label><input id="provider-base" type="url" maxlength="2048" placeholder="https://api.example.com/v1" required spellcheck="false" />
+            <p class="settings-help">不要填写完整的 /chat/completions 地址。更换域名时需重新输入密钥。</p>
+            <div class="provider-field-grid"><div><label for="provider-protocol">接口协议</label><select id="provider-protocol"><option value="openai-chat">OpenAI Chat 兼容</option><option value="anthropic">Anthropic Messages 兼容</option></select></div><div><label for="provider-model">模型 ID</label><input id="provider-model" list="provider-model-hints" type="text" maxlength="200" required spellcheck="false" /><datalist id="provider-model-hints"></datalist></div></div>
+            <label for="provider-key">API 密钥</label><input id="provider-key" type="password" maxlength="8192" autocomplete="new-password" spellcheck="false" placeholder="填写 API 密钥" />
+            <p id="provider-key-help" class="settings-help">密钥不会回显，也不会保存在浏览器中。</p>
+            <label class="provider-checkbox"><input id="provider-json" type="checkbox" /> 游戏翻译启用 JSON 输出格式（仅 Chat 兼容接口）</label>
+            <a id="provider-docs" class="provider-docs" target="_blank" rel="noopener noreferrer" hidden>查看提供方官方接入文档 ↗</a>
+            <div class="provider-editor-actions"><button id="provider-delete" class="danger-button" type="button" hidden>删除提供方</button><button id="provider-test" class="secondary-button" type="button">测试连接</button><button id="provider-save" class="secondary-button" type="submit">保存</button><button id="provider-save-use" class="primary-button" type="button">保存并使用</button></div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </dialog>
+  <script src="/translation-workflow.js"></script>
+  <script src="/app.js"></script>
+  <script src="/release.js" defer></script>
+</body>
+</html>

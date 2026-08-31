@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "description": "Fixed harness regression tasks for Nagi benchmark v2. Each run must use a fresh fixture copy and deterministic scripted outputs.",
+  "tasks": [
+    {
+      "id": "readme_intro_locked",
+      "prompt": "In the README fixture, replace the placeholder opening sentence with 'This fixture is a locked benchmark workspace.'",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 4,
+      "expected_artifact": "README.md opening sentence is locked benchmark workspace text",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('README.md').read_text(encoding='utf-8'); assert 'This fixture is a locked benchmark workspace.' in text\"",
+      "category": "documentation"
+    },
+    {
+      "id": "readme_schema_note",
+      "prompt": "Replace the first README bullet with a sentence that says the benchmark schema and baseline are fixed.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 4,
+      "expected_artifact": "README.md contains the schema and baseline note",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('README.md').read_text(encoding='utf-8'); assert 'schema and baseline are fixed' in text\"",
+      "category": "documentation"
+    },
+    {
+      "id": "sample_beta_locked",
+      "prompt": "In sample.txt, replace beta with beta-locked.",
+      "fixture_repo": "tests/fixtures/bench_repo_patch",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 4,
+      "expected_artifact": "sample.txt contains beta-locked",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('sample.txt').read_text(encoding='utf-8'); assert 'beta-locked' in text and '\\nbeta\\n' not in text\"",
+      "category": "text-edit"
+    },
+    {
+      "id": "sample_gamma_locked",
+      "prompt": "In sample.txt, replace gamma with gamma-locked.",
+      "fixture_repo": "tests/fixtures/bench_repo_patch",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 4,
+      "expected_artifact": "sample.txt contains gamma-locked",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('sample.txt').read_text(encoding='utf-8'); assert 'gamma-locked' in text\"",
+      "category": "text-edit"
+    },
+    {
+      "id": "invalid_patch_recovery",
+      "prompt": "Recover after invalid patch arguments and finish the README patch.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["patch_file", "read_file"],
+      "step_budget": 5,
+      "expected_artifact": "README.md reflects recovery after invalid patch args",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('README.md').read_text(encoding='utf-8'); assert 'recovered after invalid patch args' in text\"",
+      "category": "tool-boundary"
+    },
+    {
+      "id": "path_escape_recovery",
+      "prompt": "Reject a path escape attempt and still finish the sample.txt patch.",
+      "fixture_repo": "tests/fixtures/bench_repo_patch",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 5,
+      "expected_artifact": "sample.txt reflects recovery after path escape rejection",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('sample.txt').read_text(encoding='utf-8'); assert 'alpha-guarded' in text\"",
+      "category": "tool-boundary"
+    },
+    {
+      "id": "repeated_read_recovery",
+      "prompt": "Recover after repeated identical reads and still finish the sample.txt patch.",
+      "fixture_repo": "tests/fixtures/bench_repo_patch",
+      "allowed_tools": ["read_file", "patch_file"],
+      "step_budget": 6,
+      "expected_artifact": "sample.txt reflects recovery after repeated identical read rejection",
+      "verifier": "python3 -c \"from pathlib import Path; text = Path('sample.txt').read_text(encoding='utf-8'); assert 'repeat-guarded' in text\"",
+      "category": "tool-boundary"
+    },
+    {
+      "id": "context_reduction_checkpoint",
+      "prompt": "Finish the README update after prompt compression creates a checkpoint.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file"],
+      "step_budget": 2,
+      "expected_artifact": "README.md remains available while context reduction creates a checkpoint",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.nagi/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.nagi/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; assert report['checkpoint_id']; assert any(event.get('event') == 'checkpoint_created' and event.get('trigger') == 'context_reduction' for event in trace)\"",
+      "category": "recovery",
+      "setup": {
+        "kind": "context_reduction",
+        "history_count": 12,
+        "note_count": 6,
+        "total_budget": 700,
+        "section_budgets": {
+          "prefix": 800,
+          "memory": 800,
+          "relevant_memory": 800,
+          "history": 2400
+        }
+      }
+    },
+    {
+      "id": "freshness_reanchor_resume",
+      "prompt": "Resume the stale benchmark task and finish without trusting the old summary.",
+      "fixture_repo": "tests/fixtures/bench_repo_patch",
+      "allowed_tools": ["read_file"],
+      "step_budget": 3,
+      "expected_artifact": "sample.txt exists after stale freshness recovery",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.nagi/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.nagi/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; assert report['prompt_metadata']['resume_status'] == 'partial-stale'; assert any(event.get('event') == 'checkpoint_created' and event.get('trigger') == 'freshness_mismatch' for event in trace)\"",
+      "category": "recovery",
+      "setup": {
+        "kind": "freshness_mismatch",
+        "path": "sample.txt",
+        "summary": "sample.txt: benchmark stale summary",
+        "mutated_text": "alpha\nbeta\ngamma\nstale-updated\n"
+      }
+    },
+    {
+      "id": "workspace_mismatch_resume",
+      "prompt": "Resume after benchmark workspace drift and rebuild runtime state.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file"],
+      "step_budget": 3,
+      "expected_artifact": "README.md exists after workspace mismatch recovery",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.nagi/runs').glob('*/report.json')).read_text(encoding='utf-8')); trace = [json.loads(line) for line in next(Path('.nagi/runs').glob('*/trace.jsonl')).read_text(encoding='utf-8').splitlines()]; assert report['prompt_metadata']['resume_status'] == 'workspace-mismatch'; assert any(event.get('event') == 'runtime_identity_mismatch' for event in trace)\"",
+      "category": "recovery",
+      "setup": {
+        "kind": "workspace_mismatch"
+      }
+    },
+    {
+      "id": "durable_promotion_accept",
+      "prompt": "Capture the stable benchmark facts as durable memory and respond with only the promoted facts.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file"],
+      "step_budget": 2,
+      "expected_artifact": "README.md fixture stays available while durable promotion succeeds",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.nagi/runs').glob('*/report.json')).read_text(encoding='utf-8')); conventions = Path('.nagi/memory/topics/project-conventions.md').read_text(encoding='utf-8'); assert len(report['durable_promotions']) == 2; assert 'Preserve benchmark regression artifacts under artifacts/.' in conventions\"",
+      "category": "durable-contract"
+    },
+    {
+      "id": "durable_promotion_reject",
+      "prompt": "Capture only the stable benchmark facts into durable memory and reject anything transient or secret-shaped.",
+      "fixture_repo": "tests/fixtures/bench_repo_readme",
+      "allowed_tools": ["read_file"],
+      "step_budget": 2,
+      "expected_artifact": "README.md fixture stays available while durable rejection is recorded",
+      "verifier": "python3 -c \"import json; from pathlib import Path; report = json.loads(next(Path('.nagi/runs').glob('*/report.json')).read_text(encoding='utf-8')); assert report['durable_rejections'] == ['dependency-facts:secret_shaped', 'key-decisions:transient_task_state']; assert report['durable_promotions'] == ['project-conventions: Keep verifier outcomes stable across reruns.']\"",
+      "category": "durable-contract"
+    }
+  ]
+}

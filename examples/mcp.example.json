@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "local-example": {
+      "disabled": true,
+      "transport": "stdio",
+      "command": "node",
+      "args": ["your-server/index.js"],
+      "cwd": ".",
+      "env": {},
+      "tools": []
+    },
+    "remote-example": {
+      "disabled": true,
+      "transport": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {"Authorization": "Bearer ${MY_MCP_TOKEN}"},
+      "tools": []
+    }
+  }
+}

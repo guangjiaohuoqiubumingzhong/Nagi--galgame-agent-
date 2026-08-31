@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "dataset_id": "qlie-synthetic-translation-e2e-v1",
+  "description": "Original synthetic QLIE extraction-to-dry-run benchmark; contains no commercial game text.",
+  "fixture": {
+    "path": "tests/fixtures/qlie_synthetic/parser-input-utf8.s",
+    "sha256": "77ca4b4fa69667374c0e95a4fcafbc05b96fa2bec6e61fd82e9a7b43efbfc74f",
+    "archive_name": "GameData/data6.pack",
+    "entry_index": 7,
+    "internal_path": "scenario\\parser-fixture.s",
+    "output_path": "resolved/scenario/parser-fixture.s"
+  },
+  "expected": {
+    "segment_ids": [
+      "seg_v1_1204226ba71c6fa145e73971f52ff5b22e632f7a812745d5c33a4c97e9e5e621",
+      "seg_v1_2272b68f5f3f1850395bb243329f9d24768678a51629cdf0ab8a3277b3cddf09",
+      "seg_v1_cbcb99ee42634dfd53be908eedb77e087a79dc943afd3a1f9d77b890687ec595"
+    ],
+    "translatable_count": 2
+  },
+  "translation": {
+    "model_id": "deterministic-scripted-v1",
+    "prompt_version": "qlie-benchmark-prompt-v1",
+    "terminology_version": "qlie-benchmark-terms-v1",
+    "target_language": "zh-CN",
+    "batch_size": 1,
+    "translations": [
+      {
+        "source_text_sha256": "e5398d0c7f49312ce3526cb214ab57c46b8d9b35a4bdcb423078b79722218523",
+        "translated_text": "〖爱丽丝〗"
+      },
+      {
+        "source_text_sha256": "d4351deb1ac25834c82e556a2c10bf52052df2819b35d7252bdbba39d8dc8231",
+        "translated_text": "「你好 {name}!」"
+      }
+    ]
+  },
+  "terminology": {
+    "terms": [
+      {
+        "rule_id": "term.hello",
+        "source": "Hello",
+        "target": "你好",
+        "severity": "error"
+      }
+    ],
+    "characters": [
+      {
+        "rule_id": "character.alice",
+        "speaker": "Alice",
+        "canonical": "爱丽丝",
+        "source_names": [
+          "Alice"
+        ],
+        "severity": "error"
+      }
+    ]
+  },
+  "retrieval": {
+    "path": "benchmarks/qlie_retrieval_tasks.json",
+    "sha256": "a0b2e10be56c625b8854b0a53985cadbc44b728987560639e6ecd161dd95679a",
+    "repeats": 3
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "dataset_id": "qlie-synthetic-retrieval-v1",
+  "description": "Original synthetic visual-novel retrieval cases; contains no commercial game text.",
+  "documents": [
+    {
+      "segment_id": "synthetic:silver-key-gate",
+      "text": "The silver key opens the observatory gate at midnight.",
+      "kind": "narration",
+      "speaker": null,
+      "scene": "observatory",
+      "archive_name": "Synthetic/data0.pack",
+      "output_path": "synthetic/scenario/observatory.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:brass-key-shed",
+      "text": "The brass key opens the garden shed at noon.",
+      "kind": "narration",
+      "speaker": null,
+      "scene": "garden",
+      "archive_name": "Synthetic/data0.pack",
+      "output_path": "synthetic/scenario/garden.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:mira-profile",
+      "text": "Mira is the observatory keeper and speaks in concise formal sentences.",
+      "kind": "metadata",
+      "speaker": "Mira",
+      "scene": "character-guide",
+      "archive_name": "Synthetic/guide.pack",
+      "output_path": "synthetic/guide/characters.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:lina-profile",
+      "text": "Lina tends the garden and speaks with cheerful casual phrasing.",
+      "kind": "metadata",
+      "speaker": "Lina",
+      "scene": "character-guide",
+      "archive_name": "Synthetic/guide.pack",
+      "output_path": "synthetic/guide/characters.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:moonlit-archive-term",
+      "text": "Translate moonlit archive as lunar records in project terminology.",
+      "kind": "metadata",
+      "speaker": null,
+      "scene": "terminology",
+      "archive_name": "Synthetic/guide.pack",
+      "output_path": "synthetic/guide/terms.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:key-history",
+      "text": "We hid the silver key beneath the old telescope.",
+      "kind": "dialogue",
+      "speaker": "Mira",
+      "scene": "night",
+      "archive_name": "Synthetic/data0.pack",
+      "output_path": "synthetic/scenario/night.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:return-choice",
+      "text": "Return to the observatory.",
+      "kind": "choice",
+      "speaker": null,
+      "scene": "route-select",
+      "archive_name": "Synthetic/data0.pack",
+      "output_path": "synthetic/scenario/routes.s",
+      "translatable": true
+    },
+    {
+      "segment_id": "synthetic:library-rain",
+      "text": "Rain taps against the library window.",
+      "kind": "narration",
+      "speaker": null,
+      "scene": "library",
+      "archive_name": "Synthetic/data0.pack",
+      "output_path": "synthetic/scenario/library.s",
+      "translatable": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "multi-document-key-recall",
+      "query": "silver key observatory",
+      "relevant_segment_ids": [
+        "synthetic:silver-key-gate",
+        "synthetic:key-history"
+      ],
+      "k": 3,
+      "filters": {}
+    },
+    {
+      "id": "speaker-filter",
+      "query": "observatory keeper formal",
+      "relevant_segment_ids": ["synthetic:mira-profile"],
+      "k": 1,
+      "filters": {"speaker": "mira"}
+    },
+    {
+      "id": "character-style",
+      "query": "cheerful garden phrasing",
+      "relevant_segment_ids": ["synthetic:lina-profile"],
+      "k": 1,
+      "filters": {"kinds": ["metadata"]}
+    },
+    {
+      "id": "terminology",
+      "query": "moonlit archive terminology",
+      "relevant_segment_ids": ["synthetic:moonlit-archive-term"],
+      "k": 1,
+      "filters": {"scene": "terminology"}
+    },
+    {
+      "id": "scene-filter",
+      "query": "silver key",
+      "relevant_segment_ids": ["synthetic:key-history"],
+      "k": 2,
+      "filters": {"scene": "night"}
+    },
+    {
+      "id": "kind-and-path-filter",
+      "query": "return observatory",
+      "relevant_segment_ids": ["synthetic:return-choice"],
+      "k": 1,
+      "filters": {
+        "kinds": ["choice"],
+        "output_path_prefix": "synthetic/scenario"
+      }
+    },
+    {
+      "id": "narration-distractor",
+      "query": "rain library window",
+      "relevant_segment_ids": ["synthetic:library-rain"],
+      "k": 1,
+      "filters": {"kinds": ["narration"]}
+    }
+  ]
+}

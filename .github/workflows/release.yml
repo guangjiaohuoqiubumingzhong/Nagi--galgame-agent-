@@ -1,0 +1,49 @@
+name: Build Nagi releases
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install locked build tools
+        run: python -m pip install --require-hashes -r requirements/dev.lock
+      - name: Check tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python -c "import nagi,os; assert os.environ['GITHUB_REF_NAME'] == 'v' + nagi.__version__"
+      - name: Build source and portable
+        run: python scripts/build_release.py --portable
+      - name: Verify relocated portable package
+        run: python scripts/verify_portable.py
+      - name: Verify offline regression suite
+        run: python -m pytest tests -q
+      - name: Verify browser command behavior
+        run: node --test tests/test_composer_commands.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nagi-release-files
+          path: dist/*
+          if-no-files-found: error
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nagi-release-files
+          path: dist
+      - name: Create draft for maintainer review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --title "Nagi $GITHUB_REF_NAME" --notes-file CHANGELOG.md

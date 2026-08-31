@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging
+*.egg-info/
+build/
+dist/
+
+# Test and lint caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Local scratch space
+tmp/
+.worktrees/
+.nagi/
+.pico/
+.codex/
+.agents/
+.nagi-build/
+.mini-nagi/
+artifacts/
+readme_intro_locked/
+translations/
+playable/
+tools/locale-emulator/
+
+# Local secrets and provider configuration
+.env
+.env.*
+!.env.example
+
+# Local docs not intended for publication
+docs/*
+!docs/mcp.md
+!docs/translation-storage.md
+!docs/review-pack/
+!docs/review-pack/README.md
+!docs/architecture/
+!docs/architecture/agent-harness-v1-overview.md
+!docs/product/
+!docs/product/qlie-translation/
+!docs/product/qlie-translation/*.md
+
+# OS files
+.DS_Store
+
+# Packaging metadata
+nagi.egg-info/
+
+!docs/*.md
+!docs/architecture/*.md
+assets/screenshots/
+nagi/web_ui/*.png
+!nagi/web_ui/nagi-avatar.png
+nagi-data-dir.txt
+data/

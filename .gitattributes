@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png -text
+*.zip -text
+# Hash-pinned synthetic fixtures and benchmark inputs must preserve exact bytes.
+tests/fixtures/** -text whitespace=cr-at-eol
+benchmarks/qlie_retrieval_tasks.json -text whitespace=cr-at-eol

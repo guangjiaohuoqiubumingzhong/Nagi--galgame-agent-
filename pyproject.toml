@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools==80.10.2", "wheel==0.46.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nagi"
+dynamic = ["version"]
+description = "Local workspace agent and guarded QLIE / YU-RIS translation workbench"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp==1.29.1", "jsonschema==4.26.0"]
+rag = ["onnxruntime==1.29.0", "tokenizers==0.22.2", "numpy==2.5.2"]
+deployment = ["frida==17.17.0; sys_platform == 'win32'"]
+
+[project.scripts]
+nagi = "nagi.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest==9.1.1",
+  "ruff==0.16.5",
+  "tzdata==2026.3; sys_platform == 'win32'",
+  "build==1.4.0",
+  "setuptools==80.10.2",
+  "wheel==0.46.3",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "nagi.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["nagi*"]
+
+[tool.setuptools.package-data]
+"nagi" = ["web_ui/*.html", "web_ui/*.css", "web_ui/*.js", "web_ui/*.svg", "web_ui/nagi-avatar.png"]
+"nagi.gameio" = ["deployment_runtime/*.py", "deployment_runtime/*.js", "deployment_runtime/*.ps1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
