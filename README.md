@@ -47,15 +47,15 @@ wheel 资源由同一套路径接口加载，无需保留源码外层 web-ui 目
 | Agent / Web | 本地工作区、会话、审批、模型配置、MCP 可选工具 |
 | QLIE | 引擎游戏示例：《美少女万华镜 -罪与罚的少女-》《美少女万华镜 -神明所创造的少女们-》《Princess Lover!》 |
 | YU-RIS | 引擎游戏示例：《Aikagi》《euphoria》《Magus Tale ～Sekaiju to Koisuru Mahoutsukai～》 |
-| KiriKiri / KAG | 散装 `.ks` 与标准未加密 XP3 内的 `.ks`；作品自定义加密/过滤器会停止 |
-| Ren'Py | 保留 `.rpy` 源脚本的发行包；仅含 `.rpyc` 时会停止，不自动反编译 |
-| TyranoScript | 标准 `data/scenario/*.ks` 项目与发行目录 |
+| KiriKiri / KAG | 引擎游戏示例：《11eyes》《Amairo＊Islenauts》《Clover Day's》 |
+| Ren'Py | 引擎游戏示例：《Slay the Princess》《BAD END THEATER》《Highway Blossoms》 |
+| TyranoScript | 引擎游戏示例：《ドトコイ》《じごくのインターネッツ》《お前のスパチャで世界を救え》 |
 | 部分翻译 | 新任务沿可验证开场剧情前 50 条对白/旁白，不按资源顺序截取 |
 | 人物译名 | 正文翻译前自动统一已识别人物名，旧任务不自动重译 |
 
 当前支持上述五类引擎；作品自定义脚本方言、加密和字体插件仍可能需要按游戏单独适配。
 
-游戏示例参考 [GARbro 已验证游戏列表](https://morkt.github.io/GARbro/supported.html)，用于说明引擎归属，不代表 Nagi 已适配其中每款游戏的所有版本。具体适配版本和部署条件见[快速入门](docs/QUICKSTART.md)。
+游戏示例参考 [GARbro 已验证游戏列表](https://morkt.github.io/GARbro/supported.html)、[Ren'Py 官方作品介绍](https://www.renpy.org/)和 [TyranoScript 官方制作事例](https://tyrano.jp/example)，用于说明引擎归属，不代表 Nagi 已适配其中每款游戏的所有版本。具体适配版本和部署条件见[快速入门](docs/QUICKSTART.md)。
 
 ## 使用与开发
 
