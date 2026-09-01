@@ -58,10 +58,10 @@ def test_translation_identity_separates_product_scope_from_implemented_support(t
 
     identity = prefix.text.split("Product identity:", 1)[1].split("Runtime model:", 1)[0]
     assert "not limited to a particular game engine or content type" in identity
-    assert "QLIE is the currently implemented game-engine integration" in identity
-    assert "Other engine and file-format workflows are not implemented yet" in identity
-    assert "do not present planned integrations as available" in identity
+    assert "currently implemented game-engine integrations are QLIE, YU-RIS 479" in identity
+    assert "KiriKiri/KAG, Ren'Py, and TyranoScript" in identity
+    assert "Do not present unlisted engines, encrypted or compiled-only formats" in identity
     assert "only claim and perform capabilities listed in Tools" in identity
-    assert 'direct supported QLIE tasks to "视觉小说翻译"' in identity
+    assert 'direct supported game tasks to "视觉小说翻译"' in identity
     assert "distinguish text-level translation assistance from unavailable automated workflows" in identity
     assert "original game directory read-only" in identity

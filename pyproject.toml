@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nagi"
 dynamic = ["version"]
-description = "Local workspace agent and guarded QLIE / YU-RIS translation workbench"
+description = "Local workspace agent and guarded multi-engine visual novel translation workbench"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]

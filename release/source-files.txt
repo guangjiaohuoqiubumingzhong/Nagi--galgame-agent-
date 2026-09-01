@@ -85,6 +85,7 @@ nagi/gameio/qlie/payload.py
 nagi/gameio/qlie/pe.py
 nagi/gameio/qlie/script.py
 nagi/gameio/segments.py
+nagi/gameio/text_engines.py
 nagi/gameio/yuris.py
 nagi/gameio/yuris_opening.py
 nagi/gameio/yuris_speakers.py
@@ -131,6 +132,7 @@ nagi/translation/patch.py
 nagi/translation/planner.py
 nagi/translation/terminology.py
 nagi/translation/tool.py
+nagi/translation/text_engines.py
 nagi/translation/translator.py
 nagi/translation/validator.py
 nagi/translation/yuris.py
@@ -208,6 +210,7 @@ tests/test_security.py
 tests/test_session_commands.py
 tests/test_session_store.py
 tests/test_task_state.py
+tests/test_text_engine_adapters.py
 tests/test_tool_executor.py
 tests/test_tools.py
 tests/test_translation_context.py
@@ -229,6 +232,7 @@ scripts/verify_portable.py
 .gitattributes
 docs/review-pack/README.md
 docs/product/qlie-translation/segments-v1.schema.json
+docs/product/qlie-translation/engine-adapter-research.md
 scripts/audit_yuris_run.py
 .github/workflows/publish-portable.yml
 release/publish-request.json

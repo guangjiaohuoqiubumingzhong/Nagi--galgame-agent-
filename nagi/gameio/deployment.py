@@ -1,4 +1,4 @@
-"""Dispatch verified QLIE/YU-RIS deployments; retain legacy YU-RIS pilot support."""
+"""Dispatch verified engine deployments; retain legacy YU-RIS pilot support."""
 
 from __future__ import annotations
 
@@ -156,6 +156,10 @@ def restore_trial(item, job_factory):
 
 
 def deploy_workflow(item, progress):
+    if getattr(item, "source_kind", None) in {"kirikiri", "renpy", "tyranoscript"}:
+        from .text_engines import deploy_game
+
+        return deploy_game(item, progress)
     if getattr(item, "source_kind", None) == "yuris-479":
         return deploy_full_yuris(item, progress)
     if getattr(item, "source_kind", None) == "qlie" or getattr(item, "engine_family", None) == "QLIE":
@@ -167,7 +171,7 @@ def deploy_workflow(item, progress):
         or item.translation_job.mode != "pilot"
     ):
         raise ValueError(
-            "当前任务不属于已适配的 QLIE / YU-RIS 部署类型；旧开场试译请通过“复用已完成试译”进入。"
+            "当前任务不属于已适配的五种引擎部署类型；旧开场试译请通过“复用已完成试译”进入。"
         )
     if os.name != "nt" or importlib.util.find_spec("frida") is None:
         raise ValueError(

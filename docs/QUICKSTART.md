@@ -34,9 +34,10 @@ Windows 密钥由当前登录用户加密；换用户或换电脑需要重新输
    程序先自动统一已识别人物译名，再进行正文翻译；旧任务不自动重译。
 4. 需要可玩版时，在翻译页选择你本机的 Locale Emulator 目录并保存。
    [官方获取入口](https://github.com/xupefei/Locale-Emulator/releases)。它不随 Nagi 分发。
-5. 完成第二步后执行“嵌入游戏内”。QLIE 已适配《美少女万华镜 -罪与罚的少女-》的指定
-   原版引擎（FilePack 3.1）；YU-RIS 已适配 Case 六花的指定 YU-RIS 479 版本。
-   两者均校验程序及本次译文，不代表同引擎所有游戏都能部署。
+5. 完成第二步后执行“嵌入游戏内”。当前支持 QLIE、YU-RIS 479、KiriKiri/KAG、Ren'Py
+   和 TyranoScript，均校验原始脚本、本次译文与控制标签，并生成独立游戏副本。
+   KiriKiri 当前覆盖散装 `.ks` 和标准未加密 XP3；Ren'Py 要求发行包保留 `.rpy`；
+   TyranoScript 要求标准 `data/scenario/*.ks`。不满足边界时会停止，不会生成伪可玩入口。
    QLIE 会优先提取实际生效的补丁脚本；若旧译文来自被覆盖的基础脚本，会提示重新提取和翻译。
    原先仅保存独立译文、缺少完整预览或来源记录的旧任务，不能直接作为可玩部署输入。
 
@@ -45,7 +46,8 @@ Windows 密钥由当前登录用户加密；换用户或换电脑需要重新输
 可玩游戏根目录的“启动测试版 / 启动正式版”分别指向对应版本。
 同类旧副本会保存在 `playable/.history`，包括存档，不会直接删除。
 
-Nagi 与生成的可玩副本不是两个独立的便携程序：副本仍需要 Nagi 的 Python/Frida 运行时。
+QLIE 与 YU-RIS 的字体桥接副本仍需要 Nagi 的 Python/Frida 运行时；三种文本脚本引擎使用
+引擎原生启动入口，不依赖字体桥接运行时。
 移动 Nagi 后，双击副本中的 **重新定位Nagi.cmd** 选择新的 Nagi 目录；也可设置 NAGI_HOME。
 移动 Locale Emulator 后在 Nagi 重新选择并保存，跨电脑时需要重新准备组件。
 

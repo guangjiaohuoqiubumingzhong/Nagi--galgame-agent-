@@ -149,7 +149,7 @@
               <label class="field-label path-label" for="storage-path">文本保存目录</label>
               <div class="path-row"><input id="storage-path" placeholder="选择原文和 API 译文的保存位置" autocomplete="off" /><button id="browse-storage-button" class="secondary-button">选择</button></div>
               <div class="workflow-artifact"><span class="artifact-symbol" aria-hidden="true">文</span><div><b>提取后的工作资料</b><span>原文脚本 · 文本片段 · 来源与结构信息</span></div></div>
-              <p class="field-hint">当前支持 QLIE 和 YU-RIS 479 文本提取；其他引擎需另行适配。</p>
+              <p class="field-hint">当前支持 QLIE、YU-RIS 479、KiriKiri/KAG、Ren'Py 与 TyranoScript。加密 XP3 或仅含 .rpyc 的发行包会明确停止。</p>
               <div id="extract-result" class="step-result" hidden></div>
             </div>
             <div class="step-footer">
@@ -191,7 +191,7 @@
             <p class="step-description">将本次 API 返回的译文部署到独立游戏副本，生成汉化启动入口。</p>
             <div class="launcher-preview"><span class="launcher-icon" aria-hidden="true">▶<small>中</small></span><b>独立汉化启动文件</b><span>部署成功后，从新入口游玩汉化版</span></div>
             <ul class="deployment-checks"><li><span>原始游戏和存档</span><b>保持不变</b></li><li><span>部署位置</span><b>独立 playable 目录</b></li><li><span>资源加载与中文字体</span><b>按引擎适配</b></li></ul>
-            <div class="step-fields">
+            <div id="locale-settings-fields" class="step-fields">
               <label class="field-label" for="locale-path">本地 Locale Emulator 目录</label>
               <div class="path-row"><input id="locale-path" placeholder="选择包含 LEProc.exe 和配套 DLL 的文件夹" autocomplete="off" /><button id="browse-locale-button" class="secondary-button" type="button">选择</button></div>
               <button id="save-locale-button" class="secondary-button full-width" type="button">检查并保存目录</button>

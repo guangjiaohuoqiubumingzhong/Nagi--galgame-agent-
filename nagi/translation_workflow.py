@@ -24,6 +24,13 @@ from .translation_storage import (
 )
 
 STAGES = ("extract", "translate", "deploy")
+SOURCE_FAMILIES = {
+    "qlie": "QLIE",
+    "yuris-479": "YU-RIS",
+    "kirikiri": "KiriKiri",
+    "renpy": "RenPy",
+    "tyranoscript": "TyranoScript",
+}
 
 
 class TranslationWorkflow:
@@ -120,7 +127,7 @@ class TranslationWorkflows:
         self.state_path = Path(state_path) if state_path else None
 
     def checkpoint(self, item):
-        if self.state_path is None or item.source_kind not in {"yuris-479", "qlie"}:
+        if self.state_path is None or item.source_kind not in SOURCE_FAMILIES:
             return
         from .gameio.yuris import save_json
 
@@ -140,7 +147,7 @@ class TranslationWorkflows:
             for name in ("game_dir", "storage_dir", "output_root")
         )
         if (
-            state["source_kind"] not in {"yuris-479", "qlie"}
+            state["source_kind"] not in SOURCE_FAMILIES
             or root != receipt.parent
             or storage not in root.parents
             or game == root
@@ -149,7 +156,7 @@ class TranslationWorkflows:
             or any((p / ".git").exists() for p in (storage, *storage.parents))
         ):
             raise ValueError("Invalid translation recovery directory or engine")
-        family = "QLIE" if state["source_kind"] == "qlie" else "YU-RIS"
+        family = SOURCE_FAMILIES[state["source_kind"]]
         organized = state.get("layout_version") == 2
         if organized:
             if root.parent != storage / family / game_folder(game):
@@ -190,7 +197,7 @@ class TranslationWorkflows:
         item.extraction_job.update(
             export_dir=child(state["export_dir"]), corpus_dir=child(state["corpus_dir"])
         )
-        if family == "YU-RIS":
+        if family in {"YU-RIS", "KiriKiri", "RenPy", "TyranoScript"}:
             extraction = json.loads(
                 (Path(item.extraction_job.corpus_dir) / "extraction.json").read_text(encoding="utf-8")
             )
@@ -293,9 +300,11 @@ class TranslationWorkflows:
         with self.lock:
             if any(item.active for item in self.items.values()):
                 raise ValueError("已有翻译流程正在执行，请完成或停止后再提取。")
+            from .gameio.text_engines import SOURCE_KINDS, detect_engine
             from .gameio.yuris import is_yuris
 
-            family = "YU-RIS" if reuse_trial or is_yuris(game) else "QLIE"
+            detected = None if reuse_trial or is_yuris(game) else detect_engine(game)
+            family = "YU-RIS" if reuse_trial or is_yuris(game) else SOURCE_KINDS.get(detected, "QLIE")
             item = TranslationWorkflow(uuid4().hex[:12], game, storage, family=family)
             require_separate_output(item.output_root, game)
             require_separate_output(item.playable_root, game)
@@ -324,7 +333,7 @@ class TranslationWorkflows:
                 item.playable_root = str(playable_root(item.storage_dir, item.output_root, mode=item.translation_job.mode))
             config = None
             if stage == "translate":
-                if item.source_kind and item.source_kind not in {"yuris-479", "qlie"}:
+                if item.source_kind and item.source_kind not in SOURCE_FAMILIES:
                     raise ValueError(
                         "这是已完成的 29 条开场试译，仅支持复用并部署；不支持更改范围或全文翻译。"
                     )
@@ -334,6 +343,8 @@ class TranslationWorkflows:
                     # Keep older clients' default requests compatible. The new
                     # partial mode must never be silently promoted to full.
                     mode = "full"
+                elif item.source_kind in {"kirikiri", "renpy", "tyranoscript"} and mode == "pilot":
+                    mode = "partial"
                 if confirmed is not True:
                     raise ValueError("请先勾选并确认翻译 API 费用。")
                 previous = item.translation_job
@@ -463,11 +474,35 @@ class TranslationWorkflows:
                         f"YU-RIS 已提取 {job.total_units} 条文本；可在第二步选择翻译范围",
                     )
                     return
+                from .gameio.text_engines import SOURCE_KINDS, detect_engine
+                from .gameio.text_engines import extract_game as extract_text_game
+
+                text_engine = detect_engine(item.game_dir)
+                if text_engine:
+                    export, corpus = extract_text_game(
+                        item.game_dir, item.output_root, job, text_engine
+                    )
+                    item.source_kind = text_engine
+                    item.engine_family = SOURCE_KINDS[text_engine]
+                    item.deployment_support = {
+                        "supported": True,
+                        "profile": f"{text_engine}-text-script-v1",
+                        "message": f"已适配 {SOURCE_KINDS[text_engine]} 文本脚本；翻译后可生成独立汉化副本",
+                    }
+                    self._finish(
+                        item,
+                        stage,
+                        "completed",
+                        f"{SOURCE_KINDS[text_engine]} 已提取 {job.total_units} 条文本；可选择部分或全文翻译",
+                    )
+                    return
                 assessment = self.backend.assess_game_directory(item.game_dir)
                 if not assessment.get("supported_archive_count") or not assessment.get(
                     "key_available"
                 ):
-                    raise ValueError("未找到受支持的 QLIE 或 YU-RIS 479 资源包。")
+                    raise ValueError(
+                        "未找到受支持的 QLIE、YU-RIS 479、KiriKiri、Ren'Py 或 TyranoScript 资源。"
+                    )
                 # This stage must publish inside the explicitly chosen location.
                 assessment = {**assessment, "prepared": None}
                 export, corpus = self.backend._prepare_source(job, assessment)
@@ -508,6 +543,15 @@ class TranslationWorkflows:
                         job,
                         Path(source.corpus_dir),
                         lambda: self.backend._model_client(job.model_config),
+                    )
+                elif item.source_kind in {"kirikiri", "renpy", "tyranoscript"}:
+                    from .translation.text_engines import translate
+
+                    translate(
+                        job,
+                        Path(source.corpus_dir),
+                        lambda: self.backend._model_client(job.model_config),
+                        item.source_kind,
                     )
                 else:
                     self.backend._translate_and_publish(

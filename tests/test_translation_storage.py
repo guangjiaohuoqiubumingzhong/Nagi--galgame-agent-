@@ -14,6 +14,9 @@ from nagi.translation_storage import (
 def test_versions_share_one_engine_folder_but_installations_do_not(tmp_path):
     assert engine_family("yuris-479") == engine_family("yuris-500") == "YU-RIS"
     assert engine_family("qlie-3.0") == engine_family("qlie-3.1") == "QLIE"
+    assert engine_family("kirikiri-z") == "KiriKiri"
+    assert engine_family("renpy-8") == "RenPy"
+    assert engine_family("tyranoscript-v5") == "TyranoScript"
     first, second = tmp_path / "a/Game", tmp_path / "b/Game"
     assert game_folder(first) != game_folder(second)
     root = workflow_root(tmp_path / "translations", first, "yuris-479", "abc")

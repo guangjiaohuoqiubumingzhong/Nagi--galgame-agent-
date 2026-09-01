@@ -15,7 +15,7 @@
       <ol><li>在「设置 → 模型」填写自己的 API 服务地址、模型 ID 和密钥。</li>
       <li>确认服务价格、账户额度与数据发送范围。测试连接、Agent 对话和翻译可能产生费用。</li>
       <li>选择有权处理的游戏；可先提取文本，再确认费用并选择开场前 50 条或全文翻译。</li>
-      <li>可玩版部署仅限已适配的 Case 六花 YU-RIS 479 版本；QLIE 目前仅提取和翻译。</li></ol>
+      <li>游戏翻译现支持 QLIE、YU-RIS 479、KiriKiri/KAG、Ren'Py 与 TyranoScript；部署始终生成独立可玩副本。</li></ol>
       <p>部署前请在翻译页选择本机 Locale Emulator。<a href="https://github.com/xupefei/Locale-Emulator/releases" target="_blank" rel="noreferrer">官方获取入口</a></p>
       <p>默认 BM25。语义检索需自行安装 rag 依赖并主动运行模型下载命令，翻译过程中不会下载。</p>
       <p id="release-features"></p><p id="release-recovery" role="alert"></p>

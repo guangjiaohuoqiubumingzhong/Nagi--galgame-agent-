@@ -15,7 +15,10 @@
 ├─ nagi/                         GitHub 中的源代码
 ├─ translations/
 │  ├─ QLIE/游戏名-安装标识/translation-任务编号/
-│  └─ YU-RIS/游戏名-安装标识/translation-任务编号/
+│  ├─ YU-RIS/游戏名-安装标识/translation-任务编号/
+│  ├─ KiriKiri/游戏名-安装标识/translation-任务编号/
+│  ├─ RenPy/游戏名-安装标识/translation-任务编号/
+│  └─ TyranoScript/游戏名-安装标识/translation-任务编号/
 └─ playable/
    └─ 引擎/游戏名-安装标识/
       ├─ 启动测试版.cmd
@@ -30,7 +33,7 @@
 `translation-test` 或 `translation-formal`，不再嵌套 `localized-game-编号`。
 游戏根目录只生成 `启动测试版.cmd` 和 `启动正式版.cmd`，分别固定指向对应版本，
 不再生成通用的“启动汉化版”入口。启动文件使用相对路径，内部依赖无需移动到游戏根目录。
-这套规则由 QLIE 和 YU-RIS 共用的部署流程执行；后续引擎也沿用相同的任务、测试版和正式版目录。
+这套规则由 QLIE、YU-RIS、KiriKiri、Ren'Py 和 TyranoScript 共用的部署流程执行；后续引擎也沿用相同的任务、测试版和正式版目录。
 引擎适配只处理资源格式和运行组件，不另建引擎专用的顶层部署或验证目录。
 开发验证在系统临时目录中使用同一套目录规则，不改写正式任务的输出路径；
 需要保留的验证截图、报告和维护备份收在本机状态目录的 `maintenance/` 下，不放在工作目录顶层。

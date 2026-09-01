@@ -12,6 +12,12 @@ def engine_family(kind):
         return "YU-RIS"
     if value.startswith("qlie"):
         return "QLIE"
+    if value.startswith(("kirikiri", "kag", "xp3")):
+        return "KiriKiri"
+    if value.startswith(("renpy", "ren'py")):
+        return "RenPy"
+    if value.startswith(("tyrano", "tyranoscript")):
+        return "TyranoScript"
     raise ValueError("未识别的游戏引擎，不能选择保存目录")
 
 
@@ -45,7 +51,9 @@ def playable_slot(mode):
 def playable_root(storage, output, *, mode=None):
     storage, output = Path(storage).resolve(), Path(output).resolve()
     relative = output.relative_to(storage)
-    if len(relative.parts) != 3 or relative.parts[0] not in {"QLIE", "YU-RIS"}:
+    if len(relative.parts) != 3 or relative.parts[0] not in {
+        "QLIE", "YU-RIS", "KiriKiri", "RenPy", "TyranoScript"
+    }:
         raise ValueError("Invalid engine-organized workflow directory")
     target = storage.parent / "playable" / relative
     if mode is not None:

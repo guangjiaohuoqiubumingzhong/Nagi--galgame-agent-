@@ -98,7 +98,7 @@ const translationUI = {
     const work = this.workflow;
     if (this.pending || work?.active_stage) return '当前步骤正在执行，请等待完成或安全停止。';
     if (stage !== 'extract' && work?.stages.extract.status !== 'completed') return '请先完成第一步：提取资源，再执行后续操作。';
-    if (stage === 'translate' && work?.source_kind && work.source_kind !== 'yuris-479') return '这是旧开场试译快照；如需全文，请重新执行第一步提取资源。';
+    if (stage === 'translate' && work?.source_kind && !['yuris-479', 'qlie', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind)) return '这是旧开场试译快照；如需全文，请重新执行第一步提取资源。';
     if (stage === 'deploy' && work?.stages.translate.status !== 'completed') return '请先完成第二步：开始翻译。';
     if (stage === 'deploy' && work?.stages.deploy?.status !== 'completed' && work?.source_kind === 'yuris-479'
       && (!this.locale?.valid || document.querySelector('#locale-path').value.trim() !== this.locale.directory)) return '请先选择本地 Locale Emulator 目录，并点击“检查并保存目录”。';
@@ -176,9 +176,10 @@ const translationUI = {
     for (const id of ['extract-button', 'reuse-trial-button', 'start-button', 'deploy-button', 'browse-button', 'browse-storage-button', 'game-path', 'storage-path', 'cost-confirm']) document.querySelector(`#${id}`).disabled = busy;
     for (const id of ['locale-path', 'browse-locale-button', 'save-locale-button']) document.querySelector(`#${id}`).disabled = busy;
     document.querySelectorAll('input[name="mode"]').forEach(node => {
-      node.disabled = busy || Boolean(work?.source_kind && !['yuris-479', 'qlie'].includes(work.source_kind));
+      node.disabled = busy || Boolean(work?.source_kind && !['yuris-479', 'qlie', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind));
       if (received && work.mode) node.checked = node.value === (work.mode === 'pilot' ? 'partial' : work.mode);
     });
+    const nativeTextEngine = ['kirikiri', 'renpy', 'tyranoscript'].includes(work?.source_kind);
     const fullYuris = work?.source_kind === 'yuris-479';
     if (work?.deployment_support) {
       const support = work.deployment_support;
@@ -190,7 +191,8 @@ const translationUI = {
         document.querySelector('#deploy-message').textContent = support.message;
       }
     }
-    document.querySelector('#translation-rag-details').hidden = fullYuris;
+    document.querySelector('#translation-rag-details').hidden = fullYuris || nativeTextEngine;
+    document.querySelector('#locale-settings-fields').hidden = nativeTextEngine;
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
     const scopeChanged = work?.mode && (work.mode === 'pilot' ? 'partial' : work.mode) !== selectedMode;
     document.querySelector('#translation-description').textContent = selectedMode === 'partial'
