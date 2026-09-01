@@ -237,3 +237,4 @@ scripts/audit_yuris_run.py
 .github/workflows/publish-portable.yml
 release/publish-request.json
 release/notes-0.1.0.md
+release/notes-0.2.0.md
