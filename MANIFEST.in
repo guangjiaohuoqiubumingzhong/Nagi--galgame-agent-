@@ -4,14 +4,14 @@ recursive-include nagi *.py *.html *.css *.js *.svg *.ps1
 recursive-include docs *.md *.json
 recursive-include requirements *.lock
 recursive-include release *.json *.txt *.md
-recursive-include scripts *.py *.ps1
+recursive-include scripts *.py *.ps1 *.cs
 recursive-include tests *.py *.cjs *.md *.txt *.json *.jsonl *.ks *.s
 recursive-include benchmarks *.json
 recursive-include examples *.py *.toml *.json *.md
 recursive-include .github *.yml *.md
 global-exclude *.pyc *.png *.log
 include nagi/web_ui/nagi-avatar.png
-include assets/nagi-shortcut-icon.png assets/nagi-shortcut-icon.ico
+include assets/nagi-icon.png assets/nagi-icon.ico
 prune .codex
 prune .pico
 prune .nagi

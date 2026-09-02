@@ -57,14 +57,21 @@ def test_source_manifest_rejects_private_or_missing_input(tmp_path):
             list(source_files(tmp_path))
 
 
-def test_release_manifest_contains_avatar_and_valid_shortcut_icons():
+def test_release_manifest_contains_avatar_and_valid_application_icons():
     files = {name: path for path, name in source_files()}
     assert "nagi/web_ui/nagi-avatar.png" in files
     assert files["nagi/web_ui/nagi-avatar.png"].stat().st_size > 0
-    png = files["assets/nagi-shortcut-icon.png"].read_bytes()
-    icon = files["assets/nagi-shortcut-icon.ico"].read_bytes()
+    png = files["assets/nagi-icon.png"].read_bytes()
+    icon = files["assets/nagi-icon.ico"].read_bytes()
     assert png.startswith(b"\x89PNG\r\n\x1a\n")
     assert icon[:6] == b"\x00\x00\x01\x00\x07\x00"
+
+
+def test_data_folder_helper_does_not_depend_on_removed_start_scripts():
+    helper = (Path(__file__).resolve().parents[1] / "Choose Data Folder.cmd").read_text(encoding="utf-8")
+    assert "launch-nagi.ps1" in helper
+    assert "Start Nagi.vbs" not in helper
+    assert "Start Nagi.cmd" not in helper
 
 
 @pytest.fixture

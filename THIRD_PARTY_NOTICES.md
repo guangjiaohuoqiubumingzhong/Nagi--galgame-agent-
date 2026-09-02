@@ -7,12 +7,12 @@ Nagi original source, documentation and the simple vector N mark in
 This grant does not cover imported games, scripts, screenshots, characters,
 translation results or third-party software.
 
-`nagi/web_ui/nagi-avatar.png`, `assets/nagi-shortcut-icon.png`, and
-`assets/nagi-shortcut-icon.ico` are user-provided artwork, included unchanged
-in application packages at the repository owner's direction. They are not
-licensed under this project's MIT grant; copyright remains with their
-respective rights holders. The old CLI screenshots remain excluded from
-release inputs.
+`nagi/web_ui/nagi-avatar.png` and the reference artwork used to create
+`assets/nagi-icon.png` / `assets/nagi-icon.ico` were provided by the
+repository owner. The icon is a background-cleaned derivative generated at the
+owner's direction for the Nagi Windows launcher. These files are not licensed
+under this project's MIT grant; copyright remains with their respective rights
+holders. The old CLI screenshots remain excluded from release inputs.
 
 ## Controlled Windows runtime
 

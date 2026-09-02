@@ -101,6 +101,29 @@ def run(*args, cwd=ROOT):
     subprocess.run([str(arg) for arg in args], cwd=cwd, check=True)
 
 
+def build_windows_launcher(source, bundle):
+    compiler = (
+        Path(os.environ.get("WINDIR", r"C:\Windows"))
+        / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    )
+    if not compiler.is_file():
+        raise ValueError("Windows C# compiler missing; cannot build Nagi.exe")
+    output = bundle / "Nagi.exe"
+    run(
+        compiler,
+        "/nologo",
+        "/target:winexe",
+        "/platform:anycpu",
+        "/codepage:65001",
+        f"/win32icon:{source / 'assets/nagi-icon.ico'}",
+        f"/out:{output}",
+        "/reference:System.Windows.Forms.dll",
+        source / "scripts/NagiLauncher.cs",
+    )
+    if not output.is_file():
+        raise ValueError("Nagi.exe was not produced")
+
+
 def build(portable=False):
     if portable and (sys.platform != "win32" or sys.maxsize <= 2**32):
         raise ValueError("The portable builder requires 64-bit Windows")
@@ -141,13 +164,14 @@ def build(portable=False):
             wheel = next(wheel_dir.glob("*.whl"))
             extract(wheel, site)
             (runtime / "python313._pth").write_text("python313.zip\n.\nLib/site-packages\nimport site\n", encoding="utf-8")
-            launchers = ["Start Nagi.vbs", "Start Nagi.cmd", "Stop Nagi.cmd", "Choose Data Folder.cmd", "launch-nagi.ps1"]
+            launchers = ["Stop Nagi.cmd", "Choose Data Folder.cmd", "launch-nagi.ps1"]
             for name in [*launchers, "LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md"]:
                 shutil.copyfile(source / name, bundle / name)
             assets = bundle / "assets"
             assets.mkdir()
-            for name in ("nagi-shortcut-icon.ico", "nagi-shortcut-icon.png"):
+            for name in ("nagi-icon.ico", "nagi-icon.png"):
                 shutil.copyfile(source / "assets" / name, assets / name)
+            build_windows_launcher(source, bundle)
             for name in ("QUICKSTART.md", "UPGRADING.md", "mcp.md"):
                 destination = bundle / "docs" / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +179,7 @@ def build(portable=False):
             architecture = bundle / "docs/architecture"
             architecture.mkdir()
             shutil.copyfile(source / "docs/architecture/translation-context.md", architecture / "translation-context.md")
-            (bundle / "README.txt").write_text("Nagi " + version + "\n\nDouble-click Start Nagi.vbs (or Start Nagi.cmd).\nRead docs/QUICKSTART.md before configuring your own API.\nStop with Stop Nagi.cmd. Choose writable data with Choose Data Folder.cmd.\n", encoding="utf-8")
+            (bundle / "README.txt").write_text("Nagi " + version + "\n\nDouble-click Nagi.exe.\nRead docs/QUICKSTART.md before configuring your own API.\nStop with Stop Nagi.cmd. Choose writable data with Choose Data Folder.cmd.\n", encoding="utf-8")
             shutil.copytree(source / "release/licenses", bundle / "licenses/supplemental")
             (bundle / "VERSION.txt").write_text(version + "\n", encoding="utf-8")
             (bundle / "portable.json").write_text(json.dumps({"app_id": "nagi-workbench", "version": version, **spec}, indent=2), encoding="utf-8")

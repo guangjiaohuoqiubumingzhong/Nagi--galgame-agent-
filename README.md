@@ -1,6 +1,6 @@
 # Nagi-galgame-agent-全自动视觉小说汉化(开发中)
 
-轻量本地工作区 Agent 与视觉小说翻译工作台，提供终端和 Web 界面。当前版本 **0.3.0**，项目原创代码与矢量图标采用 [MIT](LICENSE)。
+轻量本地工作区 Agent 与视觉小说翻译工作台，提供终端和 Web 界面。当前版本 **0.3.1**，项目原创代码与矢量图标采用 [MIT](LICENSE)。
 
 Nagi 可分析和修改工作区文件、运行受审批的工具、保存会话，并进行五类视觉小说引擎的文本提取、翻译与独立副本部署。密钥与任务数据仅在用户本机保存；API 请求会按用户选择的提供方发送内容。
 
@@ -8,9 +8,9 @@ Nagi 可分析和修改工作区文件、运行受审批的工具、保存会话
 
 | 版本 | 下载附件 | 使用方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 便携版 | Nagi-0.3.0-windows-x64.zip | 完整解压后双击 Start Nagi.vbs，自带独立 Python、MCP、Frida |
-| 源码版 | Nagi-0.3.0-source.zip / 源码仓库 | 自行安装 Python 3.12+ 后初始化环境 |
-| Python 安装包 | nagi-0.3.0-py3-none-any.whl | 安装到自己的 Python 环境，网页和运行模板随包提供 |
+| Windows 10/11 x64 便携版 | Nagi-0.3.1-windows-x64.zip | 完整解压后双击唯一入口 Nagi.exe，自带独立 Python、MCP、Frida |
+| 源码版 | Nagi-0.3.1-source.zip / 源码仓库 | 自行安装 Python 3.12+ 后初始化环境 |
+| Python 安装包 | nagi-0.3.1-py3-none-any.whl | 安装到自己的 Python 环境，网页和运行模板随包提供 |
 
 源码 ZIP 不包含运行时。便携指可直接启动，不代表免费 API、免配置、离线翻译或附带游戏。
 下载附件由维护者通过 Releases 发布；仓库中的构建流程和本地构建产物不表示已经公开发布。

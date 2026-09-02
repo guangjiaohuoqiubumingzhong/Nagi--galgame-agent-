@@ -238,6 +238,8 @@ scripts/audit_yuris_run.py
 release/publish-request.json
 release/notes-0.1.0.md
 release/notes-0.2.0.md
-assets/nagi-shortcut-icon.png
-assets/nagi-shortcut-icon.ico
+assets/nagi-icon.png
+assets/nagi-icon.ico
 release/notes-0.3.0.md
+scripts/NagiLauncher.cs
+release/notes-0.3.1.md
