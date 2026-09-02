@@ -119,6 +119,62 @@ def test_text_engines_complete_existing_three_stage_workflow(tmp_path, engine, f
     assert restored.launcher_path == deployed["launcher_path"]
 
 
+def test_text_engine_repair_merges_only_untranslated_rows_and_stays_full(tmp_path):
+    game, _source_script = _fixture_game(tmp_path, "kirikiri")
+    storage = tmp_path / "translations"
+    storage.mkdir()
+    submitted = []
+
+    class Client:
+        repair = False
+        last_completion_metadata: ClassVar = {"fixture": True}
+
+        def complete(self, messages, max_new_tokens):
+            rows = json.loads(messages[-1]["content"])["texts"]
+            submitted.append((self.repair, [row["id"] for row in rows]))
+            if self.repair:
+                values = ["补翻中文[p]" for _row in rows]
+            else:
+                values = [rows[0]["text"], "已有中文"]
+            return json.dumps({"translations": [
+                {"id": row["id"], "text": value}
+                for row, value in zip(rows, values)
+            ]}, ensure_ascii=False)
+
+    client = Client()
+    service = TranslationWorkflows(
+        backend(lambda: client), deployer=deploy_workflow,
+        state_path=tmp_path / "latest-workflow.json",
+    )
+    item = service.create(str(game), str(storage))
+    settle(item)
+    service.start(item.workflow_id, "translate", mode="full", confirmed=True)
+    assert settle(item)["stages"]["translate"]["status"] == "completed"
+    full_output = item.translation_job.output_root
+    client.repair = True
+    service.start(item.workflow_id, "translate", mode="repair", confirmed=True)
+    repaired = settle(item)
+    assert repaired["stages"]["translate"]["status"] == "completed", repaired
+    assert repaired["translation_action"] == "repair"
+    assert repaired["mode"] == "full"
+    assert item.translation_job.output_root == full_output
+    assert len(submitted) == 2 and len(submitted[-1][1]) == 1
+    translations = json.loads(
+        (Path(full_output) / "translations.json").read_text(encoding="utf-8")
+    )
+    assert set(translations.values()) == {"补翻中文[p]", "已有中文"}
+    service.start(item.workflow_id, "deploy")
+    deployed = settle(item)
+    assert deployed["stages"]["deploy"]["status"] == "completed", deployed
+    assert Path(deployed["launcher_path"]).name == "启动正式版.cmd"
+    receipt = Path(item.output_root) / "workflow.json"
+    restored = TranslationWorkflows(
+        backend(lambda: client), deployer=deploy_workflow
+    ).restore(receipt)
+    assert restored.translation_action == "repair"
+    assert restored.translation_job.mode == "full"
+
+
 def _xp3(path, files):
     records = []
     with path.open("wb") as output:

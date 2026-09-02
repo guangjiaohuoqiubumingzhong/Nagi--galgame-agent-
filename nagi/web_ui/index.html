@@ -173,6 +173,7 @@
               <legend>翻译范围</legend>
               <label><input type="radio" name="mode" value="partial" /><span><b>部分翻译</b><small>仅翻译开场剧情前 50 条内容</small></span></label>
               <label><input type="radio" name="mode" value="full" checked /><span><b>全文翻译</b><small>翻译全部语料，耗时与费用更高</small></span></label>
+              <label id="repair-mode-option"><input type="radio" name="mode" value="repair" /><span><b>查缺补漏</b><small>补翻意外未翻译部分</small></span></label>
             </fieldset>
             <details id="translation-rag-details" class="rag-details"><summary>自动构建翻译上下文</summary><p id="translation-rag-status">仅召回相关前文，无需手动导入参考文件。</p></details>
             <label class="cost-confirm"><input id="cost-confirm" type="checkbox" /><span>我了解翻译会调用所选模型的 API，并产生费用。</span></label>

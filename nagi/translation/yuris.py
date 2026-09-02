@@ -335,3 +335,61 @@ def translate(job, corpus, client_factory, *, workers=4):
         message=f"{scope_label} {len(combined)} 条完成，可生成独立汉化启动文件",
         event="API 原始返回与译文已保存；资源回包和字体映射将在第三步生成",
     )
+
+
+def repair(job, corpus, client_factory, *, workers=4):
+    """Run the explicit 查缺补漏 action against an existing full result."""
+    from ..gameio.characters import yuris_characters
+    from .characters import GLOSSARY_FILE, load_glossary
+    from .repair import repair_text_result
+
+    if job.mode != "full":
+        raise ValueError("查缺补漏需要先完成一次全文翻译")
+    corpus = Path(corpus)
+    source, extraction = load_source(corpus, job.game_dir)
+    units = json.loads((corpus / "texts.json").read_text(encoding="utf-8"))
+    if sha(source) != extraction["archive_sha256"] or len(units) != extraction["text_count"]:
+        raise ValueError("提取文本或原脚本包已改变，请重新提取")
+    entries = archive_entries(source)
+    table, key, all_units = catalog(entries)
+    if units != all_units:
+        raise ValueError("全文语料与原脚本包不一致，不能查缺补漏")
+    root = Path(job.output_root)
+    plan_path = root / "translation-plan.json"
+    result_path = root / "translation-result.json"
+    if not plan_path.is_file() or not result_path.is_file():
+        raise ValueError("请先完成一次全文翻译，再使用查缺补漏")
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    config = job.model_config or {}
+    if (
+        plan.get("engine") != ENGINE
+        or plan.get("text_count") != len(units)
+        or plan.get("units_sha256")
+        != sha(json.dumps(units, ensure_ascii=False, sort_keys=True).encode())
+        or result.get("engine") != ENGINE
+        or result.get("mode", "full") != "full"
+        or result.get("storage_format") != "text-only-v1"
+        or plan.get("provider") != config.get("provider")
+        or plan.get("model") != config.get("model")
+    ):
+        raise ValueError("已有全文任务与当前语料或模型不一致，不能查缺补漏")
+    glossary = None
+    if result.get("character_glossary_version"):
+        # Reuse the exact name snapshot from the paid full run.  The catalogue
+        # reconstruction makes altered or unrelated glossary files fail closed.
+        characters = yuris_characters(entries, table, key, all_units, sha(source))
+        glossary = load_glossary(
+            root / GLOSSARY_FILE,
+            catalog=characters,
+            expected_version=result["character_glossary_version"],
+        )
+    return repair_text_result(
+        job,
+        root,
+        units,
+        client_factory,
+        engine=ENGINE,
+        glossary=glossary,
+        workers=workers,
+    )

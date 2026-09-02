@@ -1,9 +1,9 @@
 """Release boundaries: local identity, offline startup, compatibility and safety."""
 import hashlib
 import json
+import threading
 from contextlib import nullcontext
 from pathlib import Path
-import threading
 from types import SimpleNamespace
 from urllib import error, request
 
@@ -22,6 +22,15 @@ def test_resource_location_does_not_follow_working_directory(tmp_path, monkeypat
     monkeypatch.chdir(tmp_path)
     assert (paths.resource_root() / "web_ui/index.html").is_file()
     assert (paths.resource_root() / "gameio/deployment_runtime/locate_runtime.ps1").is_file()
+
+
+def test_translation_workbench_exposes_user_triggered_repair_action():
+    html = (paths.resource_root() / "web_ui/index.html").read_text(encoding="utf-8")
+    script = (paths.resource_root() / "web_ui/translation-workflow.js").read_text(encoding="utf-8")
+    assert 'name="mode" value="repair"' in html
+    assert "查缺补漏" in html
+    assert "补翻意外未翻译部分" in html
+    assert "selectedMode === 'repair'" in script
 
 
 def test_isolated_data_directory_does_not_import_parent_credentials(tmp_path, monkeypatch):

@@ -102,6 +102,15 @@ def test_requires_translation_before_deployment_and_cost_consent(workflow):
     assert calls == ["extract"]
 
 
+def test_repair_requires_supported_engine_and_completed_full_result(workflow):
+    service, game, storage, calls = workflow
+    item = service.create(str(game), str(storage))
+    settle(item)
+    with pytest.raises(ValueError, match="暂不支持"):
+        service.start(item.workflow_id, "translate", mode="repair", confirmed=True)
+    assert calls == ["extract"]
+
+
 def test_pilot_then_full_are_independent_and_clear_previous_deployment(workflow):
     service, game, storage, calls = workflow
     item = service.create(str(game), str(storage))

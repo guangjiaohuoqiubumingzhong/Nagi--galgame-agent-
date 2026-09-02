@@ -93,3 +93,46 @@ def translate(job, corpus, client_factory, engine, *, workers=4):
         message=f"{label} {len(combined)} 条完成，可生成独立汉化启动文件",
         event="API 原始返回与译文已保存；脚本回写将在第三步独立副本中完成",
     )
+
+
+def repair(job, corpus, client_factory, engine, *, workers=4):
+    """Run the explicit 查缺补漏 action for a completed full text-engine run."""
+    from .repair import repair_text_result
+
+    if job.mode != "full":
+        raise ValueError("查缺补漏需要先完成一次全文翻译")
+    corpus = Path(corpus)
+    extraction = json.loads((corpus / "extraction.json").read_text(encoding="utf-8"))
+    units = json.loads((corpus / "texts.json").read_text(encoding="utf-8"))
+    if extraction.get("engine") != engine or extraction.get("text_count") != len(units):
+        raise ValueError("提取清单与文本语料不一致，请重新提取")
+    root = Path(job.output_root)
+    plan_path = root / "translation-plan.json"
+    result_path = root / "translation-result.json"
+    if not plan_path.is_file() or not result_path.is_file():
+        raise ValueError("请先完成一次全文翻译，再使用查缺补漏")
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    config = job.model_config or {}
+    identity = {
+        key: config.get(key)
+        for key in ("provider", "model", "base_url", "protocol")
+    }
+    if (
+        plan.get("engine") != engine
+        or plan.get("mode") != "full"
+        or plan.get("text_count") != len(units)
+        or plan.get("selected_ids") != [unit["id"] for unit in units]
+        or result.get("engine") != engine
+        or result.get("mode") != "full"
+        or any(plan.get(key) != value for key, value in identity.items())
+    ):
+        raise ValueError("已有全文任务与当前语料或模型不一致，不能查缺补漏")
+    return repair_text_result(
+        job,
+        root,
+        units,
+        client_factory,
+        engine=engine,
+        workers=workers,
+    )

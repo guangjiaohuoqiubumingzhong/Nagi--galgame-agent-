@@ -130,6 +130,7 @@ nagi/translation/models.py
 nagi/translation/passages.py
 nagi/translation/patch.py
 nagi/translation/planner.py
+nagi/translation/repair.py
 nagi/translation/terminology.py
 nagi/translation/tool.py
 nagi/translation/text_engines.py
@@ -240,8 +241,12 @@ release/notes-0.1.0.md
 release/notes-0.2.0.md
 assets/nagi-icon.png
 assets/nagi-icon.ico
+assets/readme/nagi-workbench.png
+assets/readme/visual-novel-translation.png
+assets/readme/translation-result.png
 release/notes-0.3.0.md
 scripts/NagiLauncher.cs
 release/notes-0.3.1.md
 release/notes-0.3.2.md
 release/notes-0.3.5.md
+release/notes-0.4.0.md

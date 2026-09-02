@@ -1,9 +1,9 @@
-# Nagi 0.3.5 快速入门
+# Nagi 0.4.0 快速入门
 
 ## 下载与启动
 
-普通用户选择 Releases 附件 **Nagi-0.3.5-windows-x64.zip**。GitHub 自动生成的
-Source code ZIP 和 Nagi-0.3.5-source.zip 是源码，不能当成便携程序双击运行。
+普通用户选择 Releases 附件 **Nagi-0.4.0-windows-x64.zip**。GitHub 自动生成的
+Source code ZIP 和 Nagi-0.4.0-source.zip 是源码，不能当成便携程序双击运行。
 当前便携版支持 Windows 10/11 x64；不提供 ARM64、32 位或 macOS/Linux 便携包。
 
 1. 用 `Get-FileHash 文件名 -Algorithm SHA256` 对照同一发行页的 SHA256SUMS.txt。
@@ -32,7 +32,7 @@ Windows 密钥由当前登录用户加密；换用户或换电脑需要重新输
 
 1. 选择“视觉小说翻译”，选择自己有权处理的游戏与文本保存目录。
 2. 点击提取：只读原游戏，不调用模型；人物信息与原文一同提取。
-3. 选择部分翻译（开场前 50 条对白/旁白）或全文翻译，确认费用后开始。
+3. 选择部分翻译（开场前 50 条对白/旁白）或全文翻译，确认费用后开始。已有全文结果时，也可选择“查缺补漏”，只重新翻译意外保留为日文原文的条目。
    程序先自动统一已识别人物译名，再进行正文翻译；旧任务不自动重译。
 4. 需要可玩版时，在翻译页选择你本机的 Locale Emulator 目录并保存。
    [官方获取入口](https://github.com/xupefei/Locale-Emulator/releases)。它不随 Nagi 分发。

@@ -31,6 +31,7 @@ SOURCE_FAMILIES = {
     "renpy": "RenPy",
     "tyranoscript": "TyranoScript",
 }
+REPAIR_SOURCE_KINDS = {"yuris-479", "kirikiri", "renpy", "tyranoscript"}
 
 
 class TranslationWorkflow:
@@ -65,6 +66,7 @@ class TranslationWorkflow:
         self.job = None
         self.extraction_job = None
         self.translation_job = None
+        self.translation_action = None
         self.launcher_path = None
         self.deployment_launcher_path = None
         self.deployment_fingerprint = None
@@ -100,6 +102,7 @@ class TranslationWorkflow:
                 "stages": stages,
                 "job": job,
                 "mode": self.translation_job.mode if self.translation_job else None,
+                "translation_action": self.translation_action,
                 "launcher_path": self.launcher_path,
                 "deployment_launcher_path": self.deployment_launcher_path,
                 "deployment_fingerprint": self.deployment_fingerprint,
@@ -211,6 +214,14 @@ class TranslationWorkflows:
         if state.get("mode"):
             if state["mode"] not in {"full", "partial"} | ({"pilot"} if family == "QLIE" else set()):
                 raise ValueError("Invalid saved translation scope")
+            action = state.get("translation_action") or state["mode"]
+            if action not in {"full", "partial", "pilot", "repair"}:
+                raise ValueError("Invalid saved translation action")
+            if action == "repair" and (
+                state["mode"] != "full" or state["source_kind"] not in REPAIR_SOURCE_KINDS
+            ):
+                raise ValueError("Invalid saved repair action")
+            item.translation_action = action
             saved = state["job"]
             output = child(saved["output_root"])
             job = self.backend.TranslationJob(
@@ -337,8 +348,8 @@ class TranslationWorkflows:
                     raise ValueError(
                         "这是已完成的 29 条开场试译，仅支持复用并部署；不支持更改范围或全文翻译。"
                     )
-                if mode not in {"pilot", "partial", "full"}:
-                    raise ValueError("请选择部分翻译（开场剧情前 50 条）或全文翻译。")
+                if mode not in {"pilot", "partial", "full", "repair"}:
+                    raise ValueError("请选择部分翻译、全文翻译或查缺补漏。")
                 if item.source_kind == "yuris-479" and mode == "pilot":
                     # Keep older clients' default requests compatible. The new
                     # partial mode must never be silently promoted to full.
@@ -348,39 +359,65 @@ class TranslationWorkflows:
                 if confirmed is not True:
                     raise ValueError("请先勾选并确认翻译 API 费用。")
                 previous = item.translation_job
-                reusable = (
-                    previous
-                    and previous.mode == mode
-                    and item.stages["translate"]["status"] in {"failed", "cancelled"}
-                )
-                if reusable:
-                    item.job = previous
-                    if item.job.model_config is None:
-                        config = self.backend._configured_model()
-                        if any(
-                            config.get(key) != value
-                            for key, value in (item.model_identity or {}).items()
-                        ):
-                            raise ValueError(
-                                "当前模型服务与原任务不同，请切回原配置后继续"
-                            )
-                        if not config.get("api_key"):
-                            raise ValueError("请先配置原任务的模型 API 密钥")
-                        item.job.model_config = config
-                    item.job.cancel_event.clear()
-                    # Preserve the model/provider of an interrupted run.
-                else:
+                if mode == "repair":
+                    if item.source_kind not in REPAIR_SOURCE_KINDS:
+                        raise ValueError("当前引擎暂不支持查缺补漏")
+                    if (
+                        not previous
+                        or previous.mode != "full"
+                        or (
+                            item.translation_action != "repair"
+                            and item.stages["translate"]["status"] != "completed"
+                        )
+                    ):
+                        raise ValueError("请先完成一次全文翻译，再使用查缺补漏。")
                     config = self.backend._configured_model()
+                    if any(
+                        config.get(key) != value
+                        for key, value in (item.model_identity or {}).items()
+                    ):
+                        raise ValueError("当前模型服务与原全文任务不同，请切回原配置")
                     if not config.get("api_key"):
-                        raise ValueError("请先在设置 → 模型中配置并选择模型。")
-                    item.job = self.backend.TranslationJob(
-                        uuid4().hex[:12],
-                        item.game_dir,
-                        mode,
-                        str(Path(item.output_root) / (mode + "-" + uuid4().hex[:8])),
-                        model_config=config,
+                        raise ValueError("请先配置原全文任务使用的模型 API 密钥")
+                    item.job = previous
+                    item.job.model_config = config
+                    item.job.cancel_event.clear()
+                else:
+                    reusable = (
+                        previous
+                        and previous.mode == mode
+                        and item.translation_action == mode
+                        and item.stages["translate"]["status"] in {"failed", "cancelled"}
                     )
+                    if reusable:
+                        item.job = previous
+                        if item.job.model_config is None:
+                            config = self.backend._configured_model()
+                            if any(
+                                config.get(key) != value
+                                for key, value in (item.model_identity or {}).items()
+                            ):
+                                raise ValueError(
+                                    "当前模型服务与原任务不同，请切回原配置后继续"
+                                )
+                            if not config.get("api_key"):
+                                raise ValueError("请先配置原任务的模型 API 密钥")
+                            item.job.model_config = config
+                        item.job.cancel_event.clear()
+                        # Preserve the model/provider of an interrupted run.
+                    else:
+                        config = self.backend._configured_model()
+                        if not config.get("api_key"):
+                            raise ValueError("请先在设置 → 模型中配置并选择模型。")
+                        item.job = self.backend.TranslationJob(
+                            uuid4().hex[:12],
+                            item.game_dir,
+                            mode,
+                            str(Path(item.output_root) / (mode + "-" + uuid4().hex[:8])),
+                            model_config=config,
+                        )
                 item.translation_job = item.job
+                item.translation_action = mode
                 item.model_identity = {
                     key: item.job.model_config.get(key)
                     for key in ("provider", "model", "base_url", "protocol")
@@ -396,7 +433,11 @@ class TranslationWorkflows:
                 item.deployment_fingerprint = None
                 if item.layout_version == 2:
                     item.playable_layout_version = 2
-                    item.playable_root = str(playable_root(item.storage_dir, item.output_root, mode=mode))
+                    item.playable_root = str(
+                        playable_root(
+                            item.storage_dir, item.output_root, mode=item.translation_job.mode
+                        )
+                    )
             elif stage == "extract":
                 if (
                     item.extraction_job
@@ -537,22 +578,41 @@ class TranslationWorkflows:
                 ):
                     raise ValueError("第一步的提取结果已移动或删除，请重新提取。")
                 if item.source_kind == "yuris-479":
-                    from .translation.yuris import translate
+                    if item.translation_action == "repair":
+                        from .translation.yuris import repair
 
-                    translate(
-                        job,
-                        Path(source.corpus_dir),
-                        lambda: self.backend._model_client(job.model_config),
-                    )
+                        repair(
+                            job,
+                            Path(source.corpus_dir),
+                            lambda: self.backend._model_client(job.model_config),
+                        )
+                    else:
+                        from .translation.yuris import translate
+
+                        translate(
+                            job,
+                            Path(source.corpus_dir),
+                            lambda: self.backend._model_client(job.model_config),
+                        )
                 elif item.source_kind in {"kirikiri", "renpy", "tyranoscript"}:
-                    from .translation.text_engines import translate
+                    if item.translation_action == "repair":
+                        from .translation.text_engines import repair
 
-                    translate(
-                        job,
-                        Path(source.corpus_dir),
-                        lambda: self.backend._model_client(job.model_config),
-                        item.source_kind,
-                    )
+                        repair(
+                            job,
+                            Path(source.corpus_dir),
+                            lambda: self.backend._model_client(job.model_config),
+                            item.source_kind,
+                        )
+                    else:
+                        from .translation.text_engines import translate
+
+                        translate(
+                            job,
+                            Path(source.corpus_dir),
+                            lambda: self.backend._model_client(job.model_config),
+                            item.source_kind,
+                        )
                 else:
                     self.backend._translate_and_publish(
                         job, Path(source.export_dir), Path(source.corpus_dir)

@@ -5,7 +5,13 @@ from pathlib import Path
 import pytest
 
 from nagi.gameio import yuris
-from nagi.translation.yuris import batches, complete_batch, parse_response, translate
+from nagi.translation.yuris import (
+    batches,
+    complete_batch,
+    parse_response,
+    repair,
+    translate,
+)
 from nagi.webapp import TranslationJob
 
 
@@ -212,6 +218,63 @@ def test_every_extracted_record_reaches_api_and_resume_does_not_repay(
     yuris.save_json(corpus / "texts.json", expected)
     with pytest.raises(ValueError, match="complete source archive"):
         translate(job, corpus, lambda: pytest.fail("Modified source must not be sent"))
+
+
+def test_user_triggered_repair_only_retranslates_source_identical_japanese(tmp_path):
+    game, workflow = tmp_path / "game", tmp_path / "workflow"
+    (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
+    (game / "pac/ysbin.ypf").write_bytes(synthetic_archive(count=8))
+    extraction_job = TranslationJob("extract", str(game), "full", str(workflow))
+    _, corpus = yuris.extract_game(game, workflow, extraction_job)
+    units = json.loads((corpus / "texts.json").read_text(encoding="utf-8"))
+    output = workflow / "full-existing"
+    output.mkdir()
+    config = {"provider": "fake", "model": "same-model"}
+    translations = {unit["id"]: "已有中文" for unit in units}
+    selected = units[:4]
+    translations.update({unit["id"]: unit["text"] for unit in selected})
+    yuris.save_json(output / "translations.json", translations)
+    yuris.save_json(output / "translation-plan.json", {
+        "engine": yuris.ENGINE, "provider": "fake", "model": "same-model",
+        "text_count": len(units),
+        "units_sha256": yuris.sha(json.dumps(units, ensure_ascii=False, sort_keys=True).encode()),
+    })
+    yuris.save_json(output / "translation-result.json", {
+        "engine": yuris.ENGINE, "status": "completed", "translated_count": len(units),
+        "text_count": len(units), "storage_format": "text-only-v1",
+        "translations_sha256": yuris.sha((output / "translations.json").read_bytes()),
+    })
+    submitted = []
+
+    class Client:
+        def complete(self, messages, **_kwargs):
+            rows = json.loads(messages[-1]["content"])["texts"]
+            submitted.extend(rows)
+            return json.dumps({"translations": [
+                {"id": row["id"], "text": "补翻中文"} for row in rows
+            ]}, ensure_ascii=False)
+
+    job = TranslationJob(
+        "repair", str(game), "full", str(output), model_config=config,
+        translated_scripts_dir=str(output),
+    )
+    repaired = repair(job, corpus, Client)
+    assert set(repaired) == {unit["id"] for unit in selected}
+    assert [row["id"] for row in submitted] == [unit["id"] for unit in selected]
+    merged = json.loads((output / "translations.json").read_text(encoding="utf-8"))
+    assert all(merged[unit["id"]] == "补翻中文" for unit in selected)
+    assert all(merged[unit["id"]] == "已有中文" for unit in units[4:])
+    result = json.loads((output / "translation-result.json").read_text(encoding="utf-8"))
+    assert result["translated_count"] == len(units)
+    assert result["repair_history"][-1]["selected_count"] == len(selected)
+    assert len(list(output.glob(".repair-*/repair-result.json"))) == 1
+    assert not (output / "repair-active.json").exists()
+
+    # A second explicit action with no source-identical Japanese records makes
+    # no paid request and still leaves an auditable zero-selection repair run.
+    repair(job, corpus, lambda: pytest.fail("No untranslated record remains"))
+    assert len(list(output.glob(".repair-*/repair-result.json"))) == 2
 
 
 def test_glyph_mapping_reserves_decrypted_source_and_preserves_cp932_aliases():

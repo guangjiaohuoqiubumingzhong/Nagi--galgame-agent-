@@ -38,7 +38,9 @@ const translationUI = {
     if (config.latest_workflow) {
       document.querySelector('#game-path').value = config.latest_workflow.game_dir;
       document.querySelector('#storage-path').value = config.latest_workflow.storage_dir;
-      const savedMode = config.latest_workflow.mode === 'pilot' ? 'partial' : config.latest_workflow.mode || 'full';
+      const savedMode = config.latest_workflow.translation_action
+        || (config.latest_workflow.mode === 'pilot' ? 'partial' : config.latest_workflow.mode)
+        || 'full';
       const mode = document.querySelector(`input[name="mode"][value="${savedMode}"]`);
       if (mode) mode.checked = true;
       this.render(config.latest_workflow);
@@ -96,15 +98,22 @@ const translationUI = {
 
   prerequisite(stage) {
     const work = this.workflow;
+    const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+    const currentAction = work?.translation_action || (work?.mode === 'pilot' ? 'partial' : work?.mode);
     if (this.pending || work?.active_stage) return '当前步骤正在执行，请等待完成或安全停止。';
     if (stage !== 'extract' && work?.stages.extract.status !== 'completed') return '请先完成第一步：提取资源，再执行后续操作。';
     if (stage === 'translate' && work?.source_kind && !['yuris-479', 'qlie', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind)) return '这是旧开场试译快照；如需全文，请重新执行第一步提取资源。';
     if (stage === 'deploy' && work?.stages.translate.status !== 'completed') return '请先完成第二步：开始翻译。';
     if (stage === 'deploy' && work?.stages.deploy?.status !== 'completed' && work?.source_kind === 'yuris-479'
       && (!this.locale?.valid || document.querySelector('#locale-path').value.trim() !== this.locale.directory)) return '请先选择本地 Locale Emulator 目录，并点击“检查并保存目录”。';
-    if (stage === 'deploy' && (work.mode === 'pilot' ? 'partial' : work.mode) !== document.querySelector('input[name="mode"]:checked').value) return '翻译范围已经改变，请先按新范围完成第二步，再生成启动文件。';
+    if (stage === 'deploy' && currentAction !== selectedMode) return '翻译范围已经改变，请先按新范围完成第二步，再生成启动文件。';
     if (stage === 'extract' && !document.querySelector('#game-path').value.trim()) return '请选择原始游戏目录。';
     if (stage === 'extract' && !document.querySelector('#storage-path').value.trim()) return '请选择资源保存目录。';
+    if (stage === 'translate' && selectedMode === 'repair') {
+      if (!['yuris-479', 'kirikiri', 'renpy', 'tyranoscript'].includes(work?.source_kind)) return '当前引擎暂不支持查缺补漏。';
+      const repairResume = currentAction === 'repair' && ['failed', 'cancelled'].includes(work?.stages.translate.status);
+      if (!(work?.mode === 'full' && (work?.stages.translate.status === 'completed' || repairResume))) return '请先完成一次全文翻译，再使用查缺补漏。';
+    }
     if (stage === 'translate' && !document.querySelector('#cost-confirm').checked) return '请先勾选并确认翻译 API 费用。';
     return '';
   },
@@ -114,7 +123,9 @@ const translationUI = {
     const problem = this.prerequisite(stage);
     if (problem) { this.error(stage, problem); return; }
     const mode = document.querySelector('input[name="mode"]:checked').value;
-    if (stage === 'translate' && !window.confirm('请保持网络通畅，调用 API 会产生费用。确认开始？')) return;
+    if (stage === 'translate' && !window.confirm(mode === 'repair'
+      ? '查缺补漏会重新调用 API 翻译选出的内容，并产生费用。确认开始？'
+      : '请保持网络通畅，调用 API 会产生费用。确认开始？')) return;
     this.pending = true; this.render();
     try {
       const work = this.workflow;
@@ -176,8 +187,12 @@ const translationUI = {
     for (const id of ['extract-button', 'reuse-trial-button', 'start-button', 'deploy-button', 'browse-button', 'browse-storage-button', 'game-path', 'storage-path', 'cost-confirm']) document.querySelector(`#${id}`).disabled = busy;
     for (const id of ['locale-path', 'browse-locale-button', 'save-locale-button']) document.querySelector(`#${id}`).disabled = busy;
     document.querySelectorAll('input[name="mode"]').forEach(node => {
-      node.disabled = busy || Boolean(work?.source_kind && !['yuris-479', 'qlie', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind));
-      if (received && work.mode) node.checked = node.value === (work.mode === 'pilot' ? 'partial' : work.mode);
+      const unsupportedRepair = node.value === 'repair' && Boolean(work?.source_kind && !['yuris-479', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind));
+      node.disabled = busy || unsupportedRepair || Boolean(work?.source_kind && !['yuris-479', 'qlie', 'kirikiri', 'renpy', 'tyranoscript'].includes(work.source_kind));
+      if (received && work.mode) {
+        const savedAction = work.translation_action || (work.mode === 'pilot' ? 'partial' : work.mode);
+        node.checked = node.value === savedAction;
+      }
     });
     const nativeTextEngine = ['kirikiri', 'renpy', 'tyranoscript'].includes(work?.source_kind);
     const fullYuris = work?.source_kind === 'yuris-479';
@@ -194,14 +209,19 @@ const translationUI = {
     document.querySelector('#translation-rag-details').hidden = fullYuris || nativeTextEngine;
     document.querySelector('#locale-settings-fields').hidden = nativeTextEngine;
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
-    const scopeChanged = work?.mode && (work.mode === 'pilot' ? 'partial' : work.mode) !== selectedMode;
+    const currentAction = work?.translation_action || (work?.mode === 'pilot' ? 'partial' : work?.mode);
+    const scopeChanged = currentAction && currentAction !== selectedMode;
     document.querySelector('#translation-description').textContent = selectedMode === 'partial'
       ? '仅翻译开场剧情前 50 条内容'
-      : '全部已提取文本分批提交所选 API。';
+      : selectedMode === 'repair'
+        ? '从已有全文结果中找出意外未翻译的内容并重新翻译。'
+        : '全部已提取文本分批提交所选 API。';
     if (scopeChanged && !busy) {
       document.querySelector('#translate-status').textContent = '待开始';
       document.querySelector('#translate-status').className = 'status-pill pending';
-      document.querySelector('#translate-message').textContent = '已切换翻译范围，点击“开始翻译”执行；原有译文保持不变。';
+      document.querySelector('#translate-message').textContent = selectedMode === 'repair'
+        ? '已选择查缺补漏，点击开始后仅重新翻译意外未翻译部分。'
+        : '已切换翻译范围，点击“开始翻译”执行；原有译文保持不变。';
       document.querySelector('#translate-percent').textContent = '0%';
       document.querySelector('#translate-progress').setAttribute('aria-valuenow', '0');
       document.querySelector('#translate-progress span').style.width = '0%';
@@ -213,7 +233,9 @@ const translationUI = {
     document.querySelector('#extract-stop').disabled = this.pending;
     document.querySelector('#stop-button').disabled = this.pending;
     document.querySelector('#extract-button strong').textContent = work?.stages.extract.status === 'completed' ? '重新提取（新建任务）' : work && work.stages.extract.status !== 'pending' && !active ? '继续提取' : '提取资源';
-    document.querySelector('#start-button strong').textContent = !scopeChanged && ['failed', 'cancelled'].includes(work?.stages.translate.status) ? '继续翻译' : '开始翻译';
+    document.querySelector('#start-button strong').textContent = selectedMode === 'repair'
+      ? (!scopeChanged && ['failed', 'cancelled'].includes(work?.stages.translate.status) ? '继续查缺补漏' : '开始查缺补漏')
+      : (!scopeChanged && ['failed', 'cancelled'].includes(work?.stages.translate.status) ? '继续翻译' : '开始翻译');
     const overall = document.querySelector('#game-status');
     overall.textContent = active ? `${this.names[active]}中` : work?.stages.deploy.status === 'completed' ? '汉化入口已生成' : work?.stages.translate.status === 'completed' ? '译文已生成' : work?.stages.extract.status === 'completed' ? '资源已就绪' : '准备开始';
     overall.className = `status-pill ${active ? 'running' : ''}`;

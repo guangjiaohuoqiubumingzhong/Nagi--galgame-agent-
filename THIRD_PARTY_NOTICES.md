@@ -7,6 +7,10 @@ Nagi original source, documentation and the simple vector N mark in
 This grant does not cover imported games, scripts, screenshots, characters,
 translation results or third-party software.
 
+The README demonstration images under `assets/readme/` were supplied by the
+maintainer for project documentation. The in-game result image contains
+third-party game artwork and is not covered by the project's MIT license.
+
 `nagi/web_ui/nagi-avatar.png` and the reference artwork used to create
 `assets/nagi-icon.png` / `assets/nagi-icon.ico` were provided by the
 repository owner. The icon is a background-cleaned derivative generated at the
