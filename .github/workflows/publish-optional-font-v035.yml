@@ -36,15 +36,15 @@ jobs:
 
       - name: Upload and download-verify the optional font asset
         run: |
-          gh release view "$TARGET_TAG" >/dev/null
-          gh release upload "$TARGET_TAG" "$ASSET_NAME" --clobber
+          gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$TARGET_TAG" "$ASSET_NAME" --repo "$GITHUB_REPOSITORY" --clobber
           mkdir verified
-          gh release download "$TARGET_TAG" --pattern "$ASSET_NAME" --dir verified
+          gh release download "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET_NAME" --dir verified
           echo "$EXPECTED_ASSET_SHA256  verified/$ASSET_NAME" | sha256sum --check
 
       - name: Add the optional font instructions to the release page
         run: |
-          gh release view "$TARGET_TAG" --json body --jq .body > release-body.md
+          gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-body.md
           if ! grep -q "nagi-optional-font-v035" release-body.md; then
             cat >> release-body.md <<'EOF'
 
@@ -57,4 +57,4 @@ jobs:
           - 可选字体包 SHA-256：`d97cb8dea9070bd57e1cc8fda6a3397903bf2057591c1daf92a098199734b012`。
           EOF
           fi
-          gh release edit "$TARGET_TAG" --notes-file release-body.md
+          gh release edit "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-body.md
