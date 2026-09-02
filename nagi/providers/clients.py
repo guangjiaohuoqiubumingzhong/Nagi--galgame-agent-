@@ -14,6 +14,48 @@ from http.client import RemoteDisconnected
 from ..messages import normalize_messages, render_messages
 
 OPENAI_COMPATIBLE_USER_AGENT = "nagi/0.1"
+HTTP_ATTEMPTS = 4
+
+
+def _decode_json_object(body_text, backend):
+    try:
+        data = json.loads(body_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{backend} 返回了无法解析的非 JSON 内容") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"{backend} 返回了无效响应（JSON 顶层不是对象）。"
+            "这通常是模型服务暂时异常，请稍后重试；已完成的翻译批次不会丢失。"
+        )
+    return data
+
+
+def _retryable_http(code):
+    return code == 429 or 500 <= code < 600
+
+
+def _retry_delay(exc, attempt):
+    headers = getattr(exc, "headers", None)
+    value = headers.get("Retry-After") if headers is not None else None
+    try:
+        if value is not None:
+            return min(max(float(value), 0.1), 8.0)
+    except (TypeError, ValueError):
+        pass
+    return min(2**attempt, 8.0)
+
+
+def _http_failure(backend, exc, body, attempts):
+    detail = str(body or "").strip().replace("\r", " ").replace("\n", " ")[:1000]
+    if _retryable_http(exc.code):
+        message = (
+            f"{backend} request failed with HTTP {exc.code}: "
+            f"模型服务暂时繁忙或不可用，已自动尝试 {attempts} 次。"
+            "请稍后重试；已完成的翻译批次不会丢失。"
+        )
+    else:
+        message = f"{backend} request failed with HTTP {exc.code}"
+    return RuntimeError(message + (f" 服务返回：{detail}" if detail else ""))
 
 
 class FakeModelClient:
@@ -68,7 +110,7 @@ class OllamaModelClient:
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                body_text = response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Ollama request failed with HTTP {exc.code}: {body}") from exc
@@ -80,9 +122,11 @@ class OllamaModelClient:
                 f"Model: {self.model}"
             ) from exc
 
+        data = _decode_json_object(body_text, "Ollama")
         if data.get("error"):
             raise RuntimeError(f"Ollama error: {data['error']}")
-        return data.get("message", {}).get("content", "")
+        message = data.get("message")
+        return message.get("content", "") if isinstance(message, dict) else ""
 
 
 def _normalize_versioned_base_url(base_url):
@@ -96,16 +140,20 @@ def _extract_openai_text(data):
     if data.get("output_text"):
         return data["output_text"]
 
-    for item in data.get("output", []):
+    for item in data.get("output", []) or []:
+        if not isinstance(item, dict):
+            continue
         for content in item.get("content", []):
             if isinstance(content, dict):
                 text = content.get("text")
                 if text:
                     return text
 
-    choices = data.get("choices", [])
-    if choices:
+    choices = data.get("choices", []) or []
+    if choices and isinstance(choices[0], dict):
         message = choices[0].get("message", {})
+        if not isinstance(message, dict):
+            return ""
         content = message.get("content")
         if isinstance(content, str):
             return content
@@ -132,6 +180,8 @@ def _extract_openai_text_from_sse(body_text):
         try:
             event = json.loads(payload)
         except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
             continue
         event_type = event.get("type", "")
         if event_type == "response.output_text.delta":
@@ -183,6 +233,8 @@ def _extract_openai_response_from_sse(body_text):
             event = json.loads(payload)
         except json.JSONDecodeError:
             continue
+        if not isinstance(event, dict):
+            continue
         response = event.get("response")
         if isinstance(response, dict):
             last_response = response
@@ -214,9 +266,13 @@ def _extract_usage_cache_details(data):
     # 把不同 OpenAI-compatible 返回里的 usage 字段整理成统一结构，
     # 让 runtime/trace/report 不需要关心 provider 细节。
     usage = data.get("usage") or {}
+    if not isinstance(usage, dict):
+        usage = {}
     input_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
     output_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
     input_details = usage.get("input_tokens_details") or usage.get("prompt_tokens_details") or {}
+    if not isinstance(input_details, dict):
+        input_details = {}
     cached_tokens = int(input_details.get("cached_tokens") or 0)
     return {
         "input_tokens": input_tokens,
@@ -286,33 +342,43 @@ class OpenAICompatibleModelClient:
             headers=headers,
             method="POST",
         )
-        attempts = 3
+        attempts = HTTP_ATTEMPTS
+        data = None
         for attempt in range(attempts):
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
                     body_text = response.read().decode("utf-8")
                     headers = getattr(response, "headers", {}) or {}
                     content_type = headers.get("Content-Type", "")
-                break
             except urllib.error.HTTPError as exc:
                 body = exc.read().decode("utf-8", errors="replace")
-                if exc.code >= 500 and attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                if _retryable_http(exc.code) and attempt < attempts - 1:
+                    time.sleep(_retry_delay(exc, attempt))
                     continue
-                raise RuntimeError(f"OpenAI-compatible request failed with HTTP {exc.code}: {body}") from exc
+                raise _http_failure("OpenAI-compatible", exc, body, attempts) from exc
             except (urllib.error.URLError, RemoteDisconnected) as exc:
                 if attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                    time.sleep(min(2**attempt, 8.0))
                     continue
                 raise RuntimeError(
                     "Could not reach the OpenAI-compatible backend.\n"
                     f"Base URL: {self.base_url}\n"
                     f"Model: {self.model}"
                 ) from exc
+            is_stream = content_type.startswith("text/event-stream") or body_text.lstrip().startswith("data:")
+            if not is_stream:
+                try:
+                    data = _decode_json_object(body_text, "OpenAI-compatible backend")
+                except RuntimeError:
+                    if attempt < attempts - 1:
+                        time.sleep(min(2**attempt, 8.0))
+                        continue
+                    raise
+            break
 
         # 有些兼容后端返回普通 JSON，有些返回 SSE。
         # 这里两种都接住，并尽量统一抽取文本和 usage/cache 元数据。
-        if content_type.startswith("text/event-stream") or body_text.lstrip().startswith("data:"):
+        if is_stream:
             text, response_data = _extract_openai_response_from_sse(body_text)
             if isinstance(response_data, dict) and response_data:
                 # 这些元数据会一路传回 runtime，进入 trace 和 report，
@@ -327,12 +393,6 @@ class OpenAICompatibleModelClient:
                 return text
             raise RuntimeError("OpenAI-compatible error: could not extract text from event stream response")
 
-        try:
-            data = json.loads(body_text)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                "OpenAI-compatible error: backend returned non-JSON content that could not be parsed"
-            ) from exc
         if data.get("error"):
             raise RuntimeError(f"OpenAI-compatible error: {data['error']}")
         self.last_completion_metadata = {
@@ -409,40 +469,40 @@ class OpenAIChatCompatibleModelClient:
             method="POST",
         )
 
-        attempts = 3
+        attempts = HTTP_ATTEMPTS
+        data = None
         for attempt in range(attempts):
             try:
                 with (self.request_opener or urllib.request.urlopen)(request, timeout=self.timeout) as response:
                     body_text = response.read().decode("utf-8")
-                break
             except urllib.error.HTTPError as exc:
                 body = exc.read().decode("utf-8", errors="replace")
-                if exc.code >= 500 and attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                if _retryable_http(exc.code) and attempt < attempts - 1:
+                    time.sleep(_retry_delay(exc, attempt))
                     continue
-                raise RuntimeError(
-                    f"Chat-completions request failed with HTTP {exc.code}: {body}"
-                ) from exc
+                raise _http_failure("Chat-completions", exc, body, attempts) from exc
             except (urllib.error.URLError, RemoteDisconnected) as exc:
                 if attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                    time.sleep(min(2**attempt, 8.0))
                     continue
                 raise RuntimeError(
                     "Could not reach the chat-completions backend.\n"
                     f"Base URL: {self.base_url}\n"
                     f"Model: {self.model}"
                 ) from exc
+            try:
+                data = _decode_json_object(body_text, "Chat-completions backend")
+            except RuntimeError:
+                if attempt < attempts - 1:
+                    time.sleep(min(2**attempt, 8.0))
+                    continue
+                raise
+            break
 
-        try:
-            data = json.loads(body_text)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                "Chat-completions backend returned non-JSON content"
-            ) from exc
         if data.get("error"):
             raise RuntimeError(f"Chat-completions error: {data['error']}")
         choices = data.get("choices") or []
-        finish_reason = choices[0].get("finish_reason") if choices else None
+        finish_reason = choices[0].get("finish_reason") if choices and isinstance(choices[0], dict) else None
         self.last_completion_metadata = {
             "stop_reason": finish_reason,
             **_extract_usage_cache_details(data),
@@ -474,6 +534,8 @@ def _extract_anthropic_metadata(data):
             if block_type:
                 content_block_types.append(block_type)
     usage = data.get("usage") or {}
+    if not isinstance(usage, dict):
+        usage = {}
     return {
         "stop_reason": str(data.get("stop_reason", "") or ""),
         "content_block_types": content_block_types,
@@ -535,34 +597,36 @@ class AnthropicCompatibleModelClient:
             headers=headers,
             method="POST",
         )
-        attempts = 3
+        attempts = HTTP_ATTEMPTS
+        data = None
         for attempt in range(attempts):
             try:
                 with (self.request_opener or urllib.request.urlopen)(request, timeout=self.timeout) as response:
                     body_text = response.read().decode("utf-8")
-                break
             except urllib.error.HTTPError as exc:
                 body = exc.read().decode("utf-8", errors="replace")
-                if exc.code >= 500 and attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                if _retryable_http(exc.code) and attempt < attempts - 1:
+                    time.sleep(_retry_delay(exc, attempt))
                     continue
-                raise RuntimeError(f"Anthropic-compatible request failed with HTTP {exc.code}: {body}") from exc
+                raise _http_failure("Anthropic-compatible", exc, body, attempts) from exc
             except (urllib.error.URLError, RemoteDisconnected) as exc:
                 if attempt < attempts - 1:
-                    time.sleep(0.5 * (attempt + 1))
+                    time.sleep(min(2**attempt, 8.0))
                     continue
                 raise RuntimeError(
                     "Could not reach the Anthropic-compatible backend.\n"
                     f"Base URL: {self.base_url}\n"
                     f"Model: {self.model}"
                 ) from exc
+            try:
+                data = _decode_json_object(body_text, "Anthropic-compatible backend")
+            except RuntimeError:
+                if attempt < attempts - 1:
+                    time.sleep(min(2**attempt, 8.0))
+                    continue
+                raise
+            break
 
-        try:
-            data = json.loads(body_text)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                "Anthropic-compatible error: backend returned non-JSON content that could not be parsed"
-            ) from exc
         if data.get("error"):
             raise RuntimeError(f"Anthropic-compatible error: {data['error']}")
         self.last_completion_metadata = _extract_anthropic_metadata(data)

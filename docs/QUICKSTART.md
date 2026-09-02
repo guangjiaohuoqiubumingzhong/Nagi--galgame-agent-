@@ -1,9 +1,9 @@
-# Nagi 0.3.1 快速入门
+# Nagi 0.3.5 快速入门
 
 ## 下载与启动
 
-普通用户选择 Releases 附件 **Nagi-0.3.1-windows-x64.zip**。GitHub 自动生成的
-Source code ZIP 和 Nagi-0.3.1-source.zip 是源码，不能当成便携程序双击运行。
+普通用户选择 Releases 附件 **Nagi-0.3.5-windows-x64.zip**。GitHub 自动生成的
+Source code ZIP 和 Nagi-0.3.5-source.zip 是源码，不能当成便携程序双击运行。
 当前便携版支持 Windows 10/11 x64；不提供 ARM64、32 位或 macOS/Linux 便携包。
 
 1. 用 `Get-FileHash 文件名 -Algorithm SHA256` 对照同一发行页的 SHA256SUMS.txt。

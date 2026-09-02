@@ -10,6 +10,26 @@ from nagi.game_launcher import repair_runtime
 from nagi.gameio.deployment_runtime import launch
 
 
+def test_standalone_launcher_loads_sibling_under_isolated_python(tmp_path):
+    runtime = tmp_path / "已部署 runtime"
+    runtime.mkdir()
+    source = Path(launch.__file__).resolve().parent
+    for name in ("launch.py", "locale_support.py"):
+        (runtime / name).write_bytes((source / name).read_bytes())
+
+    result = subprocess.run(
+        [sys.executable, "-I", str(runtime / "launch.py"), "--help"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "ModuleNotFoundError" not in result.stderr
+
+
 def test_default_launch_detaches_before_starting_game(tmp_path, monkeypatch):
     background, run = Mock(), Mock()
     monkeypatch.setattr(sys, "platform", "win32")

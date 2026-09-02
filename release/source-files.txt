@@ -243,3 +243,5 @@ assets/nagi-icon.ico
 release/notes-0.3.0.md
 scripts/NagiLauncher.cs
 release/notes-0.3.1.md
+release/notes-0.3.2.md
+release/notes-0.3.5.md

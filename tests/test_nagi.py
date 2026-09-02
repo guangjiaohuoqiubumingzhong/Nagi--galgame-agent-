@@ -1,7 +1,9 @@
 import os
+import io
 import json
 import subprocess
 import sys
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -690,6 +692,55 @@ def test_anthropic_compatible_client_extracts_first_text_block():
         result = client.complete("hello", 42)
 
     assert result == "<final>ok</final>"
+
+
+def test_anthropic_compatible_client_rejects_json_null_without_attribute_error():
+    client = AnthropicCompatibleModelClient(
+        model="deepseek-v4-pro",
+        base_url="https://api.deepseek.com/anthropic",
+        api_key="sk-test",
+        temperature=0.2,
+        timeout=30,
+        request_opener=lambda *_args, **_kwargs: io.BytesIO(b"null"),
+    )
+
+    with patch("nagi.providers.clients.time.sleep") as sleep:
+        with pytest.raises(RuntimeError, match="JSON 顶层不是对象") as failure:
+            client.complete("hello", 42)
+
+    assert "NoneType" not in str(failure.value)
+    assert [call.args[0] for call in sleep.call_args_list] == [1, 2, 4]
+
+
+def test_anthropic_compatible_client_backs_off_on_service_overload():
+    calls = []
+
+    def overloaded(request, timeout):
+        calls.append((request.full_url, timeout))
+        raise urllib.error.HTTPError(
+            request.full_url,
+            503,
+            "Service Unavailable",
+            {},
+            io.BytesIO(b'{"error":{"type":"service_unavailable_error"}}'),
+        )
+
+    client = AnthropicCompatibleModelClient(
+        model="deepseek-v4-pro",
+        base_url="https://api.deepseek.com/anthropic",
+        api_key="sk-test",
+        temperature=0.2,
+        timeout=30,
+        request_opener=overloaded,
+    )
+
+    with patch("nagi.providers.clients.time.sleep") as sleep:
+        with pytest.raises(RuntimeError, match="模型服务暂时繁忙或不可用") as failure:
+            client.complete("hello", 42)
+
+    assert len(calls) == 4
+    assert [call.args[0] for call in sleep.call_args_list] == [1, 2, 4]
+    assert "已完成的翻译批次不会丢失" in str(failure.value)
 
 
 def test_anthropic_compatible_client_classifies_thinking_only_truncation():

@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +42,14 @@ env['PYTHONUTF8'] = '1'
 env['NAGI_APP_ROOT'] = str(moved)
 env['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
 subprocess.run([str(python), '-I', '-c', 'import nagi,frida,mcp,win32api; from nagi.paths import resource_root; assert (resource_root()/"web_ui/index.html").is_file(); print(nagi.__version__)'], cwd=destination, env=env, check=True)
+# A deployed game runtime lives outside python313._pth. Verify that its
+# standalone launcher can still load the sibling locale component by path.
+deployed_runtime = destination / '已部署游戏' / 'runtime'
+deployed_runtime.mkdir(parents=True)
+template_runtime = moved / 'runtime/Lib/site-packages/nagi/gameio/deployment_runtime'
+for name in ('launch.py', 'locale_support.py'):
+    shutil.copyfile(template_runtime / name, deployed_runtime / name)
+subprocess.run([str(python), '-I', str(deployed_runtime / 'launch.py'), '--help'], cwd=destination, env=env, check=True, capture_output=True)
 port = 18766
 command = [str(moved / 'Nagi.exe'), '--no-open', f'--port={port}']
 stop_command = [str(moved / 'Nagi.exe'), 'stop', f'--port={port}']
@@ -67,7 +76,7 @@ try:
     for line in lines:
         expected, name = line.split('  ',1)
         assert hashlib.sha256((moved / name).read_bytes()).hexdigest() == expected, name
-    result = {'status':'passed','version':first['version'],'relocated_bundle':str(moved),'features':config['release']['features'], 'verified_program_files':len(lines), 'checks':['independent Python and native extensions','Unicode/space relocation','single Nagi.exe launch entry','embedded application icon','duplicate launch identity','offline first run without key','packaged avatar and icon assets','packaged page resources','per-file SHA-256']}
+    result = {'status':'passed','version':first['version'],'relocated_bundle':str(moved),'features':config['release']['features'], 'verified_program_files':len(lines), 'checks':['independent Python and native extensions','Unicode/space relocation','standalone deployed game runtime import','single Nagi.exe launch entry','embedded application icon','duplicate launch identity','offline first run without key','packaged avatar and icon assets','packaged page resources','per-file SHA-256']}
 finally:
     subprocess.run(stop_command, cwd=destination, env=env, check=True, timeout=20)
 result['checks'].append('Nagi.exe stop')

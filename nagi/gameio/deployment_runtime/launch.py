@@ -14,10 +14,21 @@ import time
 import traceback
 from pathlib import Path
 
-try:
+if __package__:
     from .locale_support import load_settings
-except ImportError:  # Standalone deployed script, not imported as a Nagi module.
-    from locale_support import load_settings
+else:
+    # The Windows embeddable runtime uses python313._pth and intentionally does
+    # not add an executed script's directory to sys.path.  Load the deployed
+    # sibling by its exact path instead of relying on normal script semantics.
+    from importlib.util import module_from_spec, spec_from_file_location
+
+    _locale_path = Path(__file__).resolve().with_name("locale_support.py")
+    _locale_spec = spec_from_file_location("_nagi_deployed_locale_support", _locale_path)
+    if _locale_spec is None or _locale_spec.loader is None:
+        raise ImportError(f"无法加载部署运行组件：{_locale_path}")
+    _locale_module = module_from_spec(_locale_spec)
+    _locale_spec.loader.exec_module(_locale_module)
+    load_settings = _locale_module.load_settings
 
 
 LEGACY_LOCALE_FILES = {
