@@ -22,6 +22,7 @@ from nagi.webapp import TranslationJob
 def test_partial_is_opening_story_and_preserves_unselected_records(tmp_path, count):
     game = tmp_path / "game"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     source = story_archive(count=count)
     (game / "pac/ysbin.ypf").write_bytes(source)
     job = TranslationJob("partial", str(game), "partial", str(tmp_path / "partial"),
@@ -87,6 +88,7 @@ def test_partial_archive_cannot_translate_unknown_or_missing_ids():
 def test_unresolved_opening_fails_before_any_paid_request(tmp_path):
     game = tmp_path / "game"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     (game / "pac/ysbin.ypf").write_bytes(story_archive(next_target="MISSING"))
     job = TranslationJob("bad", str(game), "partial", str(tmp_path / "partial"),
                          model_config={"provider": "fake", "model": "fake"})
@@ -100,6 +102,7 @@ def test_legacy_partial_resume_and_deploy_preserve_paid_scope(tmp_path):
 
     game = tmp_path / "game"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     source = story_archive()
     (game / "pac/ysbin.ypf").write_bytes(source)
     job = TranslationJob("legacy", str(game), "partial", str(tmp_path / "partial"),

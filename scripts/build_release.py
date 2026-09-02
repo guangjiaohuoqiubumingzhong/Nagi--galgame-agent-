@@ -144,6 +144,10 @@ def build(portable=False):
             launchers = ["Start Nagi.vbs", "Start Nagi.cmd", "Stop Nagi.cmd", "Choose Data Folder.cmd", "launch-nagi.ps1"]
             for name in [*launchers, "LICENSE", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md"]:
                 shutil.copyfile(source / name, bundle / name)
+            assets = bundle / "assets"
+            assets.mkdir()
+            for name in ("nagi-shortcut-icon.ico", "nagi-shortcut-icon.png"):
+                shutil.copyfile(source / "assets" / name, assets / name)
             for name in ("QUICKSTART.md", "UPGRADING.md", "mcp.md"):
                 destination = bundle / "docs" / name
                 destination.parent.mkdir(parents=True, exist_ok=True)

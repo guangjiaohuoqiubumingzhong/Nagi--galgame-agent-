@@ -1,8 +1,8 @@
 """Engine-independent, relative launch entries in each playable game's folder."""
 
 import hashlib
-import os
 import json
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -124,6 +124,7 @@ def validate_version_launcher(game_root, target, mode, entry):
 def repair_runtime(directory):
     """Explicit repair command; verify first, back up launch metadata, keep saves."""
     import shutil
+
     from .gameio.deployment_runtime.launch import verified_manifest
     from .paths import state_root
 
@@ -133,7 +134,14 @@ def repair_runtime(directory):
     manifest, _ = verified_manifest(root)
     backup = root / ("nagi-launcher-backup-" + uuid4().hex[:8])
     backup.mkdir()
-    for name in ("deployment.json", "启动汉化版.cmd", "nagi-runtime.json", "runtime/launch.py", "runtime/locate_runtime.ps1"):
+    for name in (
+        "deployment.json",
+        "启动汉化版.cmd",
+        "nagi-runtime.json",
+        "runtime/launch.py",
+        "runtime/locale_support.py",
+        "runtime/locate_runtime.ps1",
+    ):
         source = root / name
         if source.is_symlink():
             raise ValueError("拒绝修改符号链接启动文件")
@@ -141,13 +149,31 @@ def repair_runtime(directory):
             target = backup / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-    launcher = root / "runtime/launch.py"
-    launcher.write_bytes((resource_root() / "gameio/deployment_runtime/launch.py").read_bytes())
-    manifest["files"]["runtime/launch.py"] = hashlib.sha256(launcher.read_bytes()).hexdigest()
+    for relative in ("launch.py", "locale_support.py"):
+        target = root / "runtime" / relative
+        target.parent.mkdir(exist_ok=True)
+        target.write_bytes(
+            (resource_root() / "gameio/deployment_runtime" / relative).read_bytes()
+        )
+        manifest["files"]["runtime/" + relative] = hashlib.sha256(
+            target.read_bytes()
+        ).hexdigest()
     if manifest.get("locale_settings_path"):
         manifest["locale_settings_path"] = str(state_root() / "web/locale-emulator.json")
     write_runtime_launcher(root)
+    locator = root / "runtime/locate_runtime.ps1"
+    manifest["files"]["runtime/locate_runtime.ps1"] = hashlib.sha256(
+        locator.read_bytes()
+    ).hexdigest()
     (root / "deployment.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Refresh the game-level test/formal entry as well, including Pico-era
+    # managed launchers that still point at this version directory.
+    mode = {"translation-test": "partial", "translation-formal": "full"}.get(
+        root.name
+    )
+    if mode:
+        publish_launcher(root.parent, root / "启动汉化版.cmd", mode)
+    verified_manifest(root)
     return backup
 
 

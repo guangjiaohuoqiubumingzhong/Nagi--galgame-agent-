@@ -94,6 +94,8 @@ def translated(tmp_path, monkeypatch):
     make_pack(
         game / "GameData/data6.pack", "「こんにちは。」\r\n「また明日。」\r\n", key
     )
+    (game / "RuntimeAssets").mkdir()
+    (game / "RuntimeAssets/required.bin").write_bytes(b"nonstandard runtime asset")
     (game / "SaveData").mkdir()
     (game / "SaveData/user.sav").write_bytes(b"original save")
     item = TranslationWorkflow("fixture", game, storage, family="QLIE")
@@ -214,6 +216,9 @@ def test_qlie_deploys_verified_current_result_and_keeps_saves(
     assert manifest["engine"] == "qlie" and manifest["translated_count"] == 2
     assert manifest["display_bridge"] == "qlie_font_bridge.js"
     assert not (launcher.parent / "game/SaveData").exists()
+    assert (
+        launcher.parent / "game/RuntimeAssets/required.bin"
+    ).read_bytes() == b"nonstandard runtime asset"
     pack = launcher.parent / "game/GameData/data6.pack"
     assert "简体中文测试" in read_filepack_entry(
         pack, entry_index=0, exe_path=copied_exe

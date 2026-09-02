@@ -10,14 +10,17 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from ..locale_emulator import LocaleEmulatorSettings
 from ..game_launcher import write_runtime_launcher
+from ..locale_emulator import LocaleEmulatorSettings
 from ..paths import application_root, state_root
 from ..translation_storage import deployment_paths, publish_playable
 from .deployment_runtime.locale_support import japanese_profile
 
 PROFILE_ID = "yuris479-rikka-approved-opening-v1"
-GAME_FILES = {
+# These fingerprints belong only to the opt-in archived Case Rikka trial. They
+# must never be used by the normal YU-RIS workflow, which supports the game
+# directory selected and recorded during extraction.
+LEGACY_TRIAL_GAME_FILES = {
     "M.C.2催眠研究.exe": "50ec52960b55ce3eb4a5291c5c4c37096c717af2469fbc27e7f27cd5438d9aea",
     "pac/ysbin.ypf": "d4b3b2caf38e610ec79f10b6b3a440e9636de841997f166eb8360af8eda2038c",
     "pac/bgm.ypf": "047f25f7c471d54f194edc9a5942701bb8838ffc3424d98a472650284de8093f",
@@ -74,6 +77,33 @@ def check_files(root, expected):
             raise ValueError(f"文件与已验证版本不一致，停止部署：{name}")
 
 
+SAVE_DIRECTORY_NAMES = {"save", "saves", "savedata"}
+
+
+def game_tree_inventory(root):
+    """Hash the selected game tree while excluding user saves and links."""
+    root = Path(root).resolve()
+    inventory = {}
+    paths = sorted(root.rglob("*"), key=lambda path: path.as_posix().casefold())
+    for path in paths:
+        if path.is_symlink() or (
+            hasattr(path, "is_junction") and path.is_junction()
+        ):
+            raise ValueError("原游戏包含链接或目录联接，无法安全创建独立副本")
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if any(
+            part.casefold() in SAVE_DIRECTORY_NAMES for part in relative.parts[:-1]
+        ):
+            continue
+        name = relative.as_posix()
+        inventory[name] = digest(safe_file(root, name))
+    if not inventory:
+        raise ValueError("所选游戏目录中没有可部署的文件")
+    return inventory
+
+
 def copy_checked(source, target, checksum, on_bytes=lambda _count: None):
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -105,7 +135,10 @@ def restore_trial(item, job_factory):
     root, source = Path(item.output_root), trial_root()
     check_files(
         item.game_dir,
-        {name: GAME_FILES[name] for name in ("M.C.2催眠研究.exe", "pac/ysbin.ypf")},
+        {
+            name: LEGACY_TRIAL_GAME_FILES[name]
+            for name in ("M.C.2催眠研究.exe", "pac/ysbin.ypf")
+        },
     )
     check_files(source, TRIAL_FILES)
     locale = source / "game/locale-fix/LE"
@@ -183,10 +216,12 @@ def deploy_workflow(item, progress):
     if root not in snapshot.parents or game == root or game in root.parents:
         raise ValueError("部署输出不能覆盖原游戏，且必须使用当前任务的已验证译文。")
     progress(0.02, "校验游戏版本、译文和中文字体映射")
-    check_files(game, GAME_FILES)
+    check_files(game, LEGACY_TRIAL_GAME_FILES)
     check_files(snapshot, TRIAL_FILES)
     check_files(snapshot / "locale", LOCALE_FILES)
-    total = sum(safe_file(game, p).stat().st_size for p in GAME_FILES) + 4 * 1024 * 1024
+    total = sum(
+        safe_file(game, p).stat().st_size for p in LEGACY_TRIAL_GAME_FILES
+    ) + 4 * 1024 * 1024
     if shutil.disk_usage(root).free < total + 64 * 1024 * 1024:
         raise ValueError("保存目录的剩余空间不足以创建独立游戏副本。")
     staging, output = deployment_paths(item, game)
@@ -203,7 +238,7 @@ def deploy_workflow(item, progress):
         )
 
     try:
-        for relative, checksum in GAME_FILES.items():
+        for relative, checksum in LEGACY_TRIAL_GAME_FILES.items():
             if relative == "pac/ysbin.ypf":
                 source, checksum = (
                     snapshot / "packed-source.ypf",
@@ -349,6 +384,46 @@ def yuris_assets(snapshot, game):
     return result, packed, mapping
 
 
+def yuris_game_inputs(item, game):
+    """Resolve the executable and source archive recorded by step one.
+
+    Receipts created before schema v2 did not store the executable. They remain
+    deployable by discovering it from the same saved game directory; the script
+    archive fingerprint in the completed translation still protects identity.
+    """
+    from .yuris import game_executable
+
+    root = Path(item.output_root).resolve()
+    corpus = Path(item.extraction_job.corpus_dir).resolve()
+    if root not in corpus.parents:
+        raise ValueError("YU-RIS 提取记录不属于当前任务")
+    extraction = json.loads(
+        safe_file(corpus, "extraction.json").read_text(encoding="utf-8")
+    )
+    if extraction.get("engine") != "yuris-479":
+        raise ValueError("第一步提取记录不是 YU-RIS 479")
+    recorded_root = extraction.get("game_root")
+    if recorded_root and Path(recorded_root).resolve() != game:
+        raise ValueError("第一步提取来源不是当前所选游戏目录")
+    source_relative = extraction.get("source_archive", "pac/ysbin.ypf")
+    source = safe_file(game, source_relative).resolve()
+    source_relative = source.relative_to(game).as_posix()
+    if digest(source) != extraction.get("archive_sha256"):
+        raise ValueError("原游戏脚本包在提取后发生变化，请重新提取")
+    executable_relative = extraction.get("executable")
+    executable = (
+        safe_file(game, executable_relative).resolve()
+        if executable_relative
+        else game_executable(game).resolve()
+    )
+    if (
+        extraction.get("executable_sha256")
+        and digest(executable) != extraction["executable_sha256"]
+    ):
+        raise ValueError("游戏启动文件在提取后发生变化，请重新提取")
+    return source_relative, executable.relative_to(game).as_posix()
+
+
 def deploy_full_yuris(item, progress):
     """Publish this workflow's selected API result, never the legacy pilot."""
     if os.name != "nt" or importlib.util.find_spec("frida") is None:
@@ -362,14 +437,15 @@ def deploy_full_yuris(item, progress):
     settings = LocaleEmulatorSettings(getattr(item, "locale_settings_path", None))
     settings.snapshot()  # Read-only component check; never execute on selection.
     progress(0.02, "确认当前翻译资源包、游戏版本与中文字体映射")
-    check_files(game, GAME_FILES)
+    source_relative, executable_relative = yuris_game_inputs(item, game)
     result, packed, mapping = yuris_assets(snapshot, game)
     if result.get("mode", "full") != item.translation_job.mode:
         raise ValueError("翻译结果与本次选择的范围不匹配")
-    if result["archive_sha256"] != GAME_FILES["pac/ysbin.ypf"]:
-        raise ValueError("译文的原始脚本包与所选游戏不匹配")
+    inventory = game_tree_inventory(game)
+    if source_relative not in inventory or executable_relative not in inventory:
+        raise ValueError("独立副本缺少第一步识别的脚本包或游戏启动文件")
     staging, output = deployment_paths(item, game)
-    total = sum(safe_file(game, name).stat().st_size for name in GAME_FILES)
+    total = sum(safe_file(game, name).stat().st_size for name in inventory)
     if shutil.disk_usage(staging.parent).free < total + len(packed) + 64 * 1024 * 1024:
         raise ValueError("空间不足，无法创建完整的独立汉化游戏副本")
     staging.mkdir(exist_ok=False)
@@ -383,19 +459,20 @@ def deploy_full_yuris(item, progress):
         )
 
     try:
-        for relative, checksum in GAME_FILES.items():
+        for relative, checksum in inventory.items():
             target = "game/" + relative
-            if relative == "pac/ysbin.ypf":
+            if relative == source_relative:
                 checksum = result["packed_sha256"]
                 (staging / target).parent.mkdir(parents=True, exist_ok=True)
                 (staging / target).write_bytes(packed)
-                advance(len(packed))
+                advance(safe_file(game, relative).stat().st_size)
             else:
                 copy_checked(
                     safe_file(game, relative), staging / target, checksum, advance
                 )
             files[target] = checksum
-        profile = "game/M.C.2催眠研究.exe.le.config"
+        profile = "game/" + executable_relative + ".le.config"
+        (staging / profile).parent.mkdir(parents=True, exist_ok=True)
         (staging / profile).write_bytes(japanese_profile())
         files[profile] = digest(staging / profile)
         progress(0.84, "安装 Unicode 中文显示和独立启动入口")
@@ -408,12 +485,13 @@ def deploy_full_yuris(item, progress):
         (staging / "display-map.json").write_bytes(mapping)
         manifest = {
             "schema_version": 1,
-            "profile": f"yuris479-rikka-{item.translation_job.mode}-v1",
+            "engine": "yuris-479",
+            "profile": f"yuris479-detected-{item.translation_job.mode}-v2",
             "translated_count": result["translated_count"],
             "selected_count": result["text_count"],
             "unchanged_ordinals": [],
             "unselected_count": result.get("source_text_count", result["text_count"]) - result["text_count"],
-            "executable": "game/M.C.2催眠研究.exe",
+            "executable": "game/" + executable_relative,
             "files": files,
             "original_game": str(game),
             "requires_font_bridge": True,
@@ -423,7 +501,6 @@ def deploy_full_yuris(item, progress):
         (staging / "deployment.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        launcher_name = "启动汉化版.cmd"
         write_runtime_launcher(staging)
         (staging / "使用说明.txt").write_text(
             f"双击“启动汉化版.cmd”启动独立汉化游戏。\n本次 API 已处理 {result['translated_count']} 条文本。\n"

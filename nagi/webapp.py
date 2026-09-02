@@ -1019,7 +1019,18 @@ class QlieWebHandler(BaseHTTPRequestHandler):
         route = parsed.path
         query = parse_qs(parsed.query)
         if route == "/api/health":
-            self._json({"app_id": APP_ID, "version": __version__, "installation_id": installation_id()})
+            self._json(
+                {
+                    "app_id": APP_ID,
+                    "version": __version__,
+                    "installation_id": installation_id(),
+                    "browser_active": self.server.browser_active(),
+                }
+            )
+            return
+        if route == "/api/browser-presence":
+            self.server.mark_browser_present()
+            self._json({"ok": True})
             return
         if route == "/api/settings/locale-emulator":
             self._json(_locale_settings().public())
@@ -1343,6 +1354,7 @@ class QlieWebServer(ThreadingHTTPServer):
     def __init__(self, address):
         super().__init__(address, QlieWebHandler)
         self.csrf_token = secrets.token_urlsafe(24)
+        self.browser_seen_at = 0.0
         self.recovery_warning = None
         self.translation_workflows = TranslationWorkflows(sys.modules[__name__], deployer=deploy_workflow)
         self.agent_service = AgentWebService(
@@ -1350,6 +1362,12 @@ class QlieWebServer(ThreadingHTTPServer):
             data_root(),
             _agent_model_client,
         )
+
+    def mark_browser_present(self):
+        self.browser_seen_at = time.monotonic()
+
+    def browser_active(self):
+        return time.monotonic() - self.browser_seen_at < 4.0
 
 
 def run_web_app(host=DEFAULT_HOST, port=DEFAULT_PORT, *, open_browser=True):

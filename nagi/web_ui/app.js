@@ -21,6 +21,7 @@ const state = {
   agentJobId: null,
   agentJob: null,
   agentPoll: null,
+  browserPresenceTimer: null,
   terminalHandled: false,
   composerBusy: false,
   sessionControls: {},
@@ -30,6 +31,17 @@ const state = {
   groupMode: localStorage.getItem("nagi.workspace.groupMode") || "workspace",
   sortMode: localStorage.getItem("nagi.workspace.sortMode") || "manual",
 };
+
+function markBrowserPresent() {
+  api("/api/browser-presence").catch(() => {});
+}
+
+function startBrowserPresence() {
+  markBrowserPresent();
+  if (!state.browserPresenceTimer) {
+    state.browserPresenceTimer = setInterval(markBrowserPresent, 1500);
+  }
+}
 
 async function api(path, options = {}) {
   const method = options.method || "GET";
@@ -1062,6 +1074,7 @@ function bindEvents() {
 
 async function boot() {
   bindEvents();
+  startBrowserPresence();
   setSidebarCollapsed(storedJson("nagi.sidebar.collapsed", false) === true);
   updateViewOptions();
   try {

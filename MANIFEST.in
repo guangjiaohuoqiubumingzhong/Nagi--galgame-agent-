@@ -11,6 +11,7 @@ recursive-include examples *.py *.toml *.json *.md
 recursive-include .github *.yml *.md
 global-exclude *.pyc *.png *.log
 include nagi/web_ui/nagi-avatar.png
+include assets/nagi-shortcut-icon.png assets/nagi-shortcut-icon.ico
 prune .codex
 prune .pico
 prune .nagi

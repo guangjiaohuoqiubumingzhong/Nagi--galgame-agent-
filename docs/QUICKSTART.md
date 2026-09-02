@@ -1,9 +1,9 @@
-# Nagi 0.2.0 快速入门
+# Nagi 0.3.0 快速入门
 
 ## 下载与启动
 
-普通用户选择 Releases 附件 **Nagi-0.2.0-windows-x64.zip**。GitHub 自动生成的
-Source code ZIP 和 Nagi-0.2.0-source.zip 是源码，不能当成便携程序双击运行。
+普通用户选择 Releases 附件 **Nagi-0.3.0-windows-x64.zip**。GitHub 自动生成的
+Source code ZIP 和 Nagi-0.3.0-source.zip 是源码，不能当成便携程序双击运行。
 当前便携版支持 Windows 10/11 x64；不提供 ARM64、32 位或 macOS/Linux 便携包。
 
 1. 用 `Get-FileHash 文件名 -Algorithm SHA256` 对照同一发行页的 SHA256SUMS.txt。
@@ -13,6 +13,9 @@ Source code ZIP 和 Nagi-0.2.0-source.zip 是源码，不能当成便携程序�
    不要全局关闭安全软件或修改系统执行策略。
 4. 重复双击会打开同一个服务。退出用 **Stop Nagi.cmd** 或页面底部“使用说明 → 退出 Nagi 服务”。
    先停止正在执行的任务，等待其保存完成；关闭浏览器本身不会停止后端。
+
+便携包保留网页头像，并在 `assets` 目录附带 PNG 与多尺寸 ICO 图标；手动创建 Windows
+快捷方式时可选择 `assets/nagi-shortcut-icon.ico` 作为图标。
 
 启动失败会显示错误；日志位置在“使用说明 → 数据与日志位置”，默认 `data/.nagi/web/server.log`。
 如果程序目录不可写，双击 **Choose Data Folder.cmd** 选择一个已有的可写目录；选择会保存。

@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from nagi.game_launcher import repair_runtime
 from nagi.gameio.deployment_runtime import launch
 
 
@@ -92,6 +93,46 @@ def test_background_uses_same_python_and_no_console(tmp_path, monkeypatch):
         "close_fds": True,
     }
     popen.return_value.wait.assert_not_called()
+
+
+def test_repair_runtime_replaces_legacy_absolute_python_launcher(tmp_path):
+    root = tmp_path / "playable/YU-RIS/Game/translation-formal"
+    (root / "game").mkdir(parents=True)
+    (root / "runtime").mkdir()
+    executable = root / "game/game.exe"
+    executable.write_bytes(b"MZ synthetic")
+    legacy = root / "runtime/launch.py"
+    legacy.write_text("# old runtime", encoding="utf-8")
+    internal = root / "启动汉化版.cmd"
+    internal.write_text(
+        '@echo off\n"D:\\removed\\pico\\.venv\\Scripts\\python.exe" '
+        '"%~dp0runtime\\launch.py" "%~dp0."\n',
+        encoding="utf-8",
+    )
+    digest = lambda path: __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+    manifest = {
+        "schema_version": 1,
+        "profile": "legacy-test",
+        "translated_count": 1,
+        "executable": "game/game.exe",
+        "files": {
+            "game/game.exe": digest(executable),
+            "runtime/launch.py": digest(legacy),
+        },
+    }
+    (root / "deployment.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    backup = repair_runtime(root)
+
+    assert (backup / "启动汉化版.cmd").is_file()
+    repaired = internal.read_text(encoding="utf-8")
+    assert "locate_runtime.ps1" in repaired
+    assert "removed" not in repaired and "python.exe" not in repaired
+    updated = json.loads((root / "deployment.json").read_text(encoding="utf-8"))
+    assert "runtime/locale_support.py" in updated["files"]
+    assert "runtime/locate_runtime.ps1" in updated["files"]
+    outer = root.parent / "启动正式版.cmd"
+    assert outer.is_file() and "translation-formal" in outer.read_text(encoding="utf-8")
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows console creation")

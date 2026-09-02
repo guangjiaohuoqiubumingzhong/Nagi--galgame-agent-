@@ -208,7 +208,7 @@ def test_directory_picker_http_selection_cancel_failure_and_recovery(tmp_path, m
     def failure(*args, **kwargs):
         raise subprocess.CalledProcessError(1, "picker", stderr="missing GUI component")
 
-    monkeypatch.setattr(directory_picker.subprocess, "run", failure)
+    monkeypatch.setattr(directory_picker, "_run_dialog", failure)
     try:
         with pytest.raises(urllib.error.HTTPError) as error:
             post("")
@@ -219,8 +219,8 @@ def test_directory_picker_http_selection_cancel_failure_and_recovery(tmp_path, m
         assert "手动填写" in json.load(error.value)["error"]
         assert added == []
         for selected in (None, str(tmp_path / "中文 游戏 & 目录")):
-            monkeypatch.setattr(directory_picker.subprocess, "run", lambda *a, selected=selected, **k:
-                                subprocess.CompletedProcess(a, 0, json.dumps({"path": selected})))
+            monkeypatch.setattr(directory_picker, "_run_dialog", lambda command, windows, selected=selected:
+                                subprocess.CompletedProcess(command, 0, json.dumps({"path": selected})))
             with post() as response:
                 payload = json.load(response)
             if purpose == "workspace":

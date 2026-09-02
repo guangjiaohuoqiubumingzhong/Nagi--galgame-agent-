@@ -156,6 +156,7 @@ def test_every_extracted_record_reaches_api_and_resume_does_not_repay(
 ):
     game, output = tmp_path / "game", tmp_path / "extract"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     (game / "pac/ysbin.ypf").write_bytes(
         synthetic_archive(count=120, choice_expression=choice_expression)
     )
@@ -324,6 +325,7 @@ def test_yuris_restart_restores_without_paid_calls_or_plaintext_credentials(
 
     game, storage = tmp_path / "game", tmp_path / "storage"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     storage.mkdir()
     (game / "pac/ysbin.ypf").write_bytes(synthetic_archive())
     config = {"provider": "fake", "model": "fake", "api_key": "never-persist-this-key"}
@@ -376,16 +378,22 @@ def test_workbench_three_stages_deploy_current_result(tmp_path, monkeypatch, mod
     from nagi.translation_workflow import TranslationWorkflows
     from scripts.audit_yuris_run import audit
 
-    game, storage = tmp_path / "original", tmp_path / "storage"
+    game, storage = tmp_path / "Ｍ．Ｃ．催眠研究", tmp_path / "storage"
     (game / "pac").mkdir(parents=True)
+    (game / "movies").mkdir()
+    (game / "save").mkdir()
     storage.mkdir()
     (game / "pac/ysbin.ypf").write_bytes(synthetic_archive(count=75))
-    (game / "M.C.2催眠研究.exe").write_bytes(b"test executable - never run")
-    files = {
-        name: deployment.digest(game / name)
-        for name in ("pac/ysbin.ypf", "M.C.2催眠研究.exe")
+    (game / "pac/bgm.ypf").write_bytes(b"title-specific resource")
+    (game / "movies/opening.dat").write_bytes(b"runtime movie")
+    (game / "M.C.催眠研究.exe").write_bytes(b"test executable - never run")
+    (game / "エンジン設定.exe").write_bytes(b"configuration helper")
+    (game / "save/original.sav").write_bytes(b"original save")
+    original_files = {
+        path.relative_to(game): path.read_bytes()
+        for path in game.rglob("*")
+        if path.is_file()
     }
-    monkeypatch.setattr(deployment, "GAME_FILES", files)
     from test_locale_emulator import make_locale
 
     from nagi.locale_emulator import LocaleEmulatorSettings
@@ -438,17 +446,22 @@ def test_workbench_three_stages_deploy_current_result(tmp_path, monkeypatch, mod
     assert Path(result["launcher_path"]).parent == Path(item.playable_root).parent
     assert "default_launcher_path" not in result
     assert not (Path(item.playable_root).parent / "启动汉化版.cmd").exists()
-    assert executable.is_file()
-    assert manifest["profile"] == f"yuris479-rikka-{mode}-v1"
+    assert executable == Path(item.playable_root) / "game/M.C.催眠研究.exe"
+    assert manifest["profile"] == f"yuris479-detected-{mode}-v2"
     assert manifest["translated_count"] == expected_count and manifest["unchanged_ordinals"] == []
     assert manifest["unselected_count"] == 76 - expected_count
     assert manifest["locale_settings_path"] == str(settings.path)
     assert not any("locale-fix" in name for name in manifest["files"])
     assert Path(item.playable_root) in executable.parents
+    assert (Path(item.playable_root) / "game/movies/opening.dat").read_bytes() == b"runtime movie"
+    assert (Path(item.playable_root) / "game/pac/bgm.ypf").read_bytes() == b"title-specific resource"
+    assert not (Path(item.playable_root) / "game/save").exists()
     assert not list(Path(item.output_root).rglob("*.ypf"))
-    assert all(
-        deployment.digest(game / name) == checksum for name, checksum in files.items()
-    )
+    assert original_files == {
+        path.relative_to(game): path.read_bytes()
+        for path in game.rglob("*")
+        if path.is_file()
+    }
     receipt = Path(item.output_root) / "workflow.json"
     yuris.save_json(receipt, item.public_dict())
     restored = TranslationWorkflows(webapp).restore(receipt)

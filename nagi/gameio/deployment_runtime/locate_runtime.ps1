@@ -33,7 +33,12 @@ try {
         Set-Location -LiteralPath $appRoot
         $stateDirectory = & $python -c 'from nagi.paths import state_root; print(state_root())'
         if ($LASTEXITCODE -ne 0) { throw '无法加载 Nagi 配置路径。' }
-        $env:NAGI_LOCALE_SETTINGS = Join-Path $stateDirectory 'web\locale-emulator.json'
+        $localeSettings = Join-Path $stateDirectory 'web\locale-emulator.json'
+        if (Test-Path -LiteralPath $localeSettings) {
+            $env:NAGI_LOCALE_SETTINGS = $localeSettings
+        } else {
+            Remove-Item Env:NAGI_LOCALE_SETTINGS -ErrorAction SilentlyContinue
+        }
         $locator.app_root = $appRoot
         $locator.relative_app = $null
         $locator | ConvertTo-Json | Set-Content -LiteralPath $locatorPath -Encoding UTF8

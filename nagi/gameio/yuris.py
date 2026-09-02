@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 import struct
+import unicodedata
 import zlib
 from collections import Counter
 from pathlib import Path, PureWindowsPath
@@ -36,6 +37,48 @@ for _a, _b in (
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def game_executable(game):
+    """Select the game entry point from the directory chosen by the user.
+
+    YU-RIS is an engine family, not a single title. A deployment must therefore
+    record the executable found during extraction instead of assuming a title-
+    specific filename. Prefer an executable whose stem matches the selected
+    directory, then avoid common configuration/uninstall helpers and finally use
+    file size as a stable tie breaker.
+    """
+    root = Path(game).resolve()
+    auxiliary = {
+        "config", "configuration", "crashreporter", "dxsetup", "setup",
+        "uninstall", "unins000", "update", "updater", "エンジン設定",
+        "環境設定", "設定", "コンフィグ",
+    }
+
+    def normalized(value):
+        return unicodedata.normalize("NFKC", value).casefold()
+
+    directory_name = normalized(root.name)
+    candidates = []
+    for path in root.glob("*.exe"):
+        if path.is_symlink() or not path.is_file():
+            continue
+        stem = normalized(path.stem)
+        helper = stem in auxiliary or any(
+            token in stem for token in ("uninstall", "unins", "config", "設定")
+        )
+        candidates.append(
+            (
+                stem != directory_name,
+                helper,
+                -path.stat().st_size,
+                normalized(path.name),
+                path,
+            )
+        )
+    if not candidates:
+        raise ValueError("YU-RIS 游戏目录中未找到可启动的 Windows EXE")
+    return min(candidates)[-1]
 
 
 def save_json(path, value):
@@ -418,7 +461,9 @@ def catalog(entries):
 def extract_game(game, output, job):
     from .characters import publish_catalogue, yuris_characters
 
-    archive = Path(game) / "pac" / "ysbin.ypf"
+    game = Path(game).resolve()
+    executable = game_executable(game)
+    archive = game / "pac" / "ysbin.ypf"
     data = archive.read_bytes()
     entries = archive_entries(data)
     table, key, units = catalog(entries)
@@ -432,7 +477,11 @@ def extract_game(game, output, job):
     save_json(
         corpus / "extraction.json",
         {
+            "schema_version": 2,
             "engine": ENGINE,
+            "game_root": str(game),
+            "executable": executable.relative_to(game).as_posix(),
+            "executable_sha256": sha(executable.read_bytes()),
             "source_archive": "pac/ysbin.ypf",
             "storage_format": "text-only-v1",
             "archive_sha256": sha(data),

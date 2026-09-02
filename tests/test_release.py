@@ -1,6 +1,7 @@
 """Release boundaries: local identity, offline startup, compatibility and safety."""
 import hashlib
 import json
+from contextlib import nullcontext
 from pathlib import Path
 import threading
 from types import SimpleNamespace
@@ -8,11 +9,12 @@ from urllib import error, request
 
 import pytest
 
+import nagi.launcher as launcher_module
 from nagi import __version__, paths, webapp
 from nagi.config import load_project_env
 from nagi.game_launcher import repair_runtime, write_runtime_launcher
 from nagi.gameio.deployment_runtime.launch import verified_manifest
-from nagi.launcher import probe
+from nagi.launcher import _browser_is_active, probe
 from scripts.build_release import source_files
 
 
@@ -53,6 +55,16 @@ def test_source_manifest_rejects_private_or_missing_input(tmp_path):
         manifest.write_text(name)
         with pytest.raises(ValueError):
             list(source_files(tmp_path))
+
+
+def test_release_manifest_contains_avatar_and_valid_shortcut_icons():
+    files = {name: path for path, name in source_files()}
+    assert "nagi/web_ui/nagi-avatar.png" in files
+    assert files["nagi/web_ui/nagi-avatar.png"].stat().st_size > 0
+    png = files["assets/nagi-shortcut-icon.png"].read_bytes()
+    icon = files["assets/nagi-shortcut-icon.ico"].read_bytes()
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert icon[:6] == b"\x00\x00\x01\x00\x07\x00"
 
 
 @pytest.fixture
@@ -116,6 +128,30 @@ def test_foreign_service_is_not_reused(monkeypatch):
     monkeypatch.setattr("nagi.launcher.request", lambda *args: {"app_id":"other-service"})
     with pytest.raises(ValueError, match="其他程序"):
         probe(8765)
+
+
+def test_browser_presence_prevents_duplicate_desktop_window(local_server):
+    port = local_server.server_address[1]
+    assert _browser_is_active(probe(port)) is False
+    with fetch(local_server, "/api/browser-presence") as response:
+        assert json.load(response)["ok"] is True
+    assert _browser_is_active(probe(port)) is True
+
+
+def test_desktop_launcher_reuses_an_active_nagi_page(monkeypatch):
+    monkeypatch.setattr(launcher_module, "ensure_data_directory", lambda: None)
+    monkeypatch.setattr(launcher_module, "startup_lock", lambda: nullcontext())
+    monkeypatch.setattr(
+        launcher_module,
+        "probe",
+        lambda _port: {"browser_active": True},
+    )
+    opened = []
+    monkeypatch.setattr(launcher_module.webbrowser, "open", opened.append)
+
+    launcher_module.launch(8765)
+
+    assert opened == []
 
 
 def test_game_runtime_repair_preserves_game_and_saves(tmp_path, monkeypatch):

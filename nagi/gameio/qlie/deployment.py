@@ -191,25 +191,14 @@ def verify_effective_layers(game, replacements):
 
 
 def game_inventory(game, executable):
-    """Only runtime assets; never bring original saves or unrelated launchers."""
-    game = Path(game)
-    paths = [executable]
-    paths.extend(game.glob("*.dll"))
-    paths.extend(game.glob("Engine*.u.txt"))
-    if (game / "version.txt").is_file():
-        paths.append(game / "version.txt")
-    for directory in ("GameData", "DLL"):
-        folder = game / directory
-        if folder.is_symlink() or (
-            hasattr(folder, "is_junction") and folder.is_junction()
-        ):
-            raise ValueError("QLIE 游戏资源目录不能是链接")
-        if folder.is_dir():
-            paths.extend(p for p in folder.rglob("*") if p.is_file())
-    inventory = {}
-    for path in paths:
-        relative = path.relative_to(game).as_posix()
-        inventory[relative] = digest(safe_file(game, relative))
+    """Use the selected game tree, not a title-specific directory allowlist."""
+    from ..deployment import game_tree_inventory
+
+    game = Path(game).resolve()
+    inventory = game_tree_inventory(game)
+    relative = executable.relative_to(game).as_posix()
+    if relative not in inventory:
+        raise ValueError("QLIE 独立副本缺少已识别的游戏启动文件")
     return inventory
 
 

@@ -64,6 +64,7 @@ class WorkspaceContext:
                     text=True,
                     check=True,
                     timeout=5,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 return result.stdout.strip() or fallback
             except Exception:

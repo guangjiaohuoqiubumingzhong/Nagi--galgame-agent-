@@ -26,7 +26,11 @@ def prepared(tmp_path, monkeypatch):
             checksums[name] = deploy.digest(path)
         return checksums
 
-    monkeypatch.setattr(deploy, "GAME_FILES", fill(game, deploy.GAME_FILES))
+    monkeypatch.setattr(
+        deploy,
+        "LEGACY_TRIAL_GAME_FILES",
+        fill(game, deploy.LEGACY_TRIAL_GAME_FILES),
+    )
     monkeypatch.setattr(deploy, "TRIAL_FILES", fill(trial, deploy.TRIAL_FILES))
     monkeypatch.setattr(
         deploy, "LOCALE_FILES", fill(trial / "game/locale-fix/LE", deploy.LOCALE_FILES)

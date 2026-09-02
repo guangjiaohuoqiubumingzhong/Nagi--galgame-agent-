@@ -41,6 +41,7 @@ def test_moved_workflow_restores_external_playable_without_model_calls(
 
     game, storage = tmp_path / "game", tmp_path / "translations"
     (game / "pac").mkdir(parents=True)
+    (game / "game.exe").write_bytes(b"MZ synthetic YU-RIS executable")
     storage.mkdir()
     (game / "pac/ysbin.ypf").write_bytes(synthetic_archive())
     service = TranslationWorkflows(webapp, state_path=tmp_path / "latest.json")

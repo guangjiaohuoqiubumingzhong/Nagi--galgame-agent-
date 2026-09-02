@@ -133,6 +133,7 @@ def test_yuris_failed_name_phase_never_submits_body_and_body_retry_reuses_names(
     job = job_at(tmp_path)
     game = Path(job.game_dir)
     (game / 'pac').mkdir(parents=True)
+    (game / 'game.exe').write_bytes(b'MZ synthetic YU-RIS executable')
     (game / 'pac/ysbin.ypf').write_bytes(speaker_archive())
     _, corpus = yuris.extract_game(game, tmp_path / 'translation-source', job)
     calls = []
@@ -168,6 +169,7 @@ def test_yuris_names_precede_body_and_drive_display_fields_outside_partial_scope
     job = job_at(tmp_path, mode=mode)
     game = Path(job.game_dir)
     (game / 'pac').mkdir(parents=True)
+    (game / 'game.exe').write_bytes(b'MZ synthetic YU-RIS executable')
     (game / 'pac/ysbin.ypf').write_bytes(source)
     _, corpus = yuris.extract_game(game, tmp_path / 'translation-source', job)
     catalog = json.loads((corpus / 'characters.json').read_text(encoding='utf-8'))
@@ -282,6 +284,7 @@ def test_yuris_legacy_paid_batches_still_resume_without_name_calls(tmp_path):
     job = job_at(tmp_path)
     game = Path(job.game_dir)
     (game / 'pac').mkdir(parents=True)
+    (game / 'game.exe').write_bytes(b'MZ synthetic YU-RIS executable')
     (game / 'pac/ysbin.ypf').write_bytes(source)
     _, corpus = yuris.extract_game(game, tmp_path / 'extracted', job)
     units = json.loads((corpus / 'texts.json').read_text(encoding='utf-8'))

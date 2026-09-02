@@ -7,7 +7,7 @@ from urllib import error, request
 import pytest
 
 from nagi.gameio.deployment_runtime import locale_support
-from nagi.gameio.deployment_runtime.launch import locale_command
+from nagi.gameio.deployment_runtime.launch import LEGACY_LOCALE_FILES, locale_command
 from nagi.locale_emulator import LocaleEmulatorSettings
 
 
@@ -103,6 +103,24 @@ def test_launcher_uses_independent_profile_and_external_tool(tmp_path):
     assert (
         locale_command(game, {}, exe)[1] == "-runas"
     )  # Existing packages remain runnable.
+
+
+def test_legacy_verified_bundle_ignores_new_machine_settings(tmp_path, monkeypatch):
+    external = make_locale(tmp_path / "new-machine-LE")
+    settings = LocaleEmulatorSettings(tmp_path / "settings.json")
+    settings.save(str(external))
+    monkeypatch.setenv("NAGI_LOCALE_SETTINGS", str(settings.path))
+    game = tmp_path / "legacy-playable"
+    executable = game / "game/legacy.exe"
+    manifest = {
+        "executable": "game/legacy.exe",
+        "files": {name: "verified" for name in LEGACY_LOCALE_FILES},
+    }
+
+    command = locale_command(game, manifest, executable)
+
+    assert command[0] == str(game / "game/locale-fix/LE/LEProc.exe")
+    assert command[1] == "-runas"
 
 
 def test_locale_http_settings_require_csrf_and_validate_directory(

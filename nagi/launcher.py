@@ -61,6 +61,20 @@ def probe(port):
     return result
 
 
+def _browser_is_active(health):
+    return isinstance(health, dict) and health.get("browser_active") is True
+
+
+def _wait_for_existing_browser(port, timeout=1.6):
+    """Give an already open tab time to reconnect after a backend restart."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _browser_is_active(probe(port)):
+            return True
+        time.sleep(0.15)
+    return False
+
+
 @contextmanager
 def startup_lock():
     path = state_root() / "web" / "launcher.lock"
@@ -96,9 +110,11 @@ def startup_lock():
 
 def launch(port=8765, *, open_browser=True):
     ensure_data_directory()
+    started_backend = False
     with startup_lock():
         existing = probe(port)
         if existing is None:
+            started_backend = True
             log_path = state_root() / "web" / "server.log"
             environment = dict(os.environ, NAGI_APP_ROOT=str(application_root()), NAGI_DATA_DIR=str(data_root()), PYTHONUTF8="1")
             with log_path.open("ab") as log:
@@ -119,7 +135,14 @@ def launch(port=8765, *, open_browser=True):
                 process.terminate()
                 raise ValueError(f"Nagi 启动超时。日志：{log_path}")
     if open_browser:
-        webbrowser.open(f"http://127.0.0.1:{port}/")
+        health = probe(port)
+        # Reuse the current Nagi page.  A freshly restarted backend gets a
+        # short grace period so an existing tab's heartbeat can reconnect.
+        browser_active = _browser_is_active(health)
+        if not browser_active and started_backend:
+            browser_active = _wait_for_existing_browser(port)
+        if not browser_active:
+            webbrowser.open(f"http://127.0.0.1:{port}/")
 
 
 def stop(port=8765):

@@ -21,6 +21,12 @@ moved = destination / '移动后的 Nagi 程序'
 # Both resolved paths are inside our freshly created, empty test directory.
 assert bundle.resolve().is_relative_to(destination.resolve()) and moved.resolve().is_relative_to(destination.resolve())
 bundle.rename(moved)
+for asset in (
+    'assets/nagi-shortcut-icon.ico',
+    'assets/nagi-shortcut-icon.png',
+    'runtime/Lib/site-packages/nagi/web_ui/nagi-avatar.png',
+):
+    assert (moved / asset).is_file() and (moved / asset).stat().st_size > 0, asset
 python = moved / 'runtime/python.exe'
 env = {k:v for k,v in os.environ.items() if not k.startswith(('PICO_', 'NAGI_')) and k not in {'PYTHONHOME','PYTHONPATH'}}
 env['PYTHONUTF8'] = '1'
@@ -53,7 +59,7 @@ try:
     for line in lines:
         expected, name = line.split('  ',1)
         assert hashlib.sha256((moved / name).read_bytes()).hexdigest() == expected, name
-    result = {'status':'passed','version':first['version'],'relocated_bundle':str(moved),'features':config['release']['features'], 'verified_program_files':len(lines), 'checks':['independent Python and native extensions','Unicode/space relocation','actual PowerShell launcher','duplicate launch identity','offline first run without key','packaged page resources','per-file SHA-256']}
+    result = {'status':'passed','version':first['version'],'relocated_bundle':str(moved),'features':config['release']['features'], 'verified_program_files':len(lines), 'checks':['independent Python and native extensions','Unicode/space relocation','actual PowerShell launcher','duplicate launch identity','offline first run without key','packaged avatar and shortcut icons','packaged page resources','per-file SHA-256']}
 finally:
     subprocess.run([*command, '-Stop'], cwd=destination, env=env, check=True, timeout=20)
 result['checks'].append('PowerShell stop')

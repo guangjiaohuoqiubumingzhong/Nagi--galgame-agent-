@@ -20,6 +20,16 @@ except ImportError:  # Standalone deployed script, not imported as a Nagi module
     from locale_support import load_settings
 
 
+LEGACY_LOCALE_FILES = {
+    "game/locale-fix/LE/LECommonLibrary.dll",
+    "game/locale-fix/LE/LEConfig.xml",
+    "game/locale-fix/LE/LEProc.exe",
+    "game/locale-fix/LE/LEVersion.xml",
+    "game/locale-fix/LE/LoaderDll.dll",
+    "game/locale-fix/LE/LocaleEmulator.dll",
+}
+
+
 def process_path(pid):
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.OpenProcess.restype = ctypes.c_void_p
@@ -89,16 +99,17 @@ def verified_manifest(root):
 
 def locale_command(root, manifest, executable):
     settings_path = os.environ.get("NAGI_LOCALE_SETTINGS") or manifest.get("locale_settings_path")
-    if settings_path:
+    profile = manifest.get("executable", "") + ".le.config"
+    files = set(manifest.get("files", {}))
+    if settings_path and profile in files:
         settings = load_settings(settings_path)
-        profile = manifest["executable"] + ".le.config"
-        if profile not in manifest["files"]:
-            raise ValueError("The independent Locale Emulator profile is not verified")
         return [
             str(Path(settings["directory"]) / "LEProc.exe"),
             "-run",
             str(executable),
         ]
+    if settings_path and not LEGACY_LOCALE_FILES <= files:
+        raise ValueError("The independent Locale Emulator profile is not verified")
     # Already published game copies retain their original, verified components.
     return [
         str(root / "game/locale-fix/LE/LEProc.exe"),

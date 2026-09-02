@@ -9,9 +9,12 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 _PICKER_LOCK = threading.Lock()
+_DIALOG_TIMEOUT = 600
+_WINDOW_VISIBILITY_TIMEOUT = 8
 _TITLES = {
     "game": "选择游戏目录",
     "storage": "选择文本保存目录",
@@ -61,6 +64,104 @@ def _windows_picker(title):
             "-EncodedCommand", encoded]
 
 
+def _visible_picker_window(process_id):
+    """Return True only after the native folder dialog has a visible HWND."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+    from ctypes import wintypes
+
+    found = False
+    callback_type = ctypes.WINFUNCTYPE(
+        wintypes.BOOL, wintypes.HWND, wintypes.LPARAM
+    )
+    user32 = ctypes.windll.user32
+    user32.GetWindowThreadProcessId.argtypes = [
+        wintypes.HWND, ctypes.POINTER(wintypes.DWORD)
+    ]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsWindowVisible.restype = wintypes.BOOL
+    user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetClassNameW.restype = ctypes.c_int
+
+    @callback_type
+    def inspect(handle, _state):
+        nonlocal found
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(handle, ctypes.byref(owner))
+        if owner.value != process_id or not user32.IsWindowVisible(handle):
+            return True
+        class_name = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(handle, class_name, len(class_name))
+        # WinForms FolderBrowserDialog is a native dialog. Ignore the invisible
+        # WindowsForms owner used only to place it above the browser.
+        if class_name.value == "#32770":
+            found = True
+            return False
+        return True
+
+    user32.EnumWindows(inspect, 0)
+    return found
+
+
+def _stop_process(process):
+    process.terminate()
+    try:
+        return process.communicate(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        return process.communicate()
+
+
+def _run_windows_dialog(command):
+    """Run a native picker, but never let an invisible dialog retain the lock."""
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    visibility_deadline = time.monotonic() + _WINDOW_VISIBILITY_TIMEOUT
+    while process.poll() is None:
+        if _visible_picker_window(process.pid):
+            break
+        if time.monotonic() >= visibility_deadline:
+            _stop_process(process)
+            raise RuntimeError(
+                "目录选择窗口未能显示，已自动取消。请从桌面快捷方式启动 Nagi 后重试，"
+                "或手动填写完整目录路径。"
+            )
+        time.sleep(0.05)
+    try:
+        stdout, stderr = process.communicate(timeout=_DIALOG_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        _stop_process(process)
+        raise
+    if process.returncode:
+        raise subprocess.CalledProcessError(
+            process.returncode, command, output=stdout, stderr=stderr
+        )
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def _run_dialog(command, windows):
+    if windows:
+        return _run_windows_dialog(command)
+    return subprocess.run(
+        command,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+        timeout=_DIALOG_TIMEOUT,
+        creationflags=0,
+    )
+
+
 def choose_directory(purpose="game"):
     """Return a folder or None on cancellation; surface failures as API errors."""
     if not isinstance(purpose, str) or purpose not in _TITLES:
@@ -73,11 +174,7 @@ def choose_directory(purpose="game"):
         command = (_windows_picker(title) if windows else
                    [sys.executable, str(Path(__file__).resolve()), title])
         try:
-            result = subprocess.run(
-                command, capture_output=True, encoding="utf-8", errors="replace",
-                check=True, timeout=600,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if windows else 0,
-            )
+            result = _run_dialog(command, windows)
             payload = json.loads(result.stdout.lstrip("\ufeff"))
             if not isinstance(payload, dict):
                 raise TypeError("invalid directory dialog response")
