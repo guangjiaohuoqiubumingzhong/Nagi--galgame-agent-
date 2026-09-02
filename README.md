@@ -18,6 +18,10 @@ Nagi 可分析和修改工作区文件、运行受审批的工具、保存会话
 
 ![视觉小说实际翻译效果](assets/readme/translation-result.png)
 
+![视觉小说实际翻译效果（二）](assets/readme/translation-result-02.png)
+
+![视觉小说实际翻译效果（三）](assets/readme/translation-result-03.png)
+
 ## 选择发行方式
 
 | 版本 | 下载附件 | 使用方式 |
@@ -74,6 +78,7 @@ wheel 资源由同一套路径接口加载，无需保留源码外层 web-ui 目
 ## 使用与开发
 
 - [普通用户快速入门](docs/QUICKSTART.md)：启动、API、游戏、LE、翻译与输出位置。
+- [视觉小说翻译功能简介](docs/TRANSLATION.md)：使用流程、API 配置、输出目录、启动方式与 RAG 说明。
 - [更新和数据兼容](docs/UPGRADING.md)：程序/数据分离、旧名称兼容、跨电脑密钥与运行时重新定位。
 - [MCP](docs/mcp.md) 与 [无密钥示例](examples/mcp.example.json)。
 - [详细功能和 CLI](docs/REFERENCE.md)、[上下文检索](docs/architecture/translation-context.md)。
