@@ -4,6 +4,20 @@
 
 Nagi 可分析和修改工作区文件、运行受审批的工具、保存会话，并进行五类视觉小说引擎的文本提取、翻译与独立副本部署。密钥与任务数据仅在用户本机保存；API 请求会按用户选择的提供方发送内容。
 
+## 界面预览
+
+### Nagi 工作台
+
+![Nagi 工作台界面](assets/readme/nagi-workbench.png)
+
+### 视觉小说翻译工作流
+
+![视觉小说翻译工作流界面](assets/readme/visual-novel-translation.png)
+
+### 实际翻译效果
+
+![视觉小说实际翻译效果](assets/readme/translation-result.png)
+
 ## 选择发行方式
 
 | 版本 | 下载附件 | 使用方式 |
