@@ -1,0 +1,60 @@
+name: Publish Nagi 0.3.5 optional font
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-optional-font-v035.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nagi-v035-optional-font
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_TAG: v0.3.5
+      ASSET_NAME: Nagi-0.3.5-optional-font-MSGothic_WenQuanYi-cnjp.zip
+      FONT_BLOB_SHA: 81ac76450bd3c90832b7c9bda4dc47ae942828ac
+      EXPECTED_ASSET_SHA256: d97cb8dea9070bd57e1cc8fda6a3397903bf2057591c1daf92a098199734b012
+      EXPECTED_FONT_SHA256: 94ddf86bb662c2f5197cfb7e5ba1ae07525abe587cbd76ca9aa683b6e93ae2ad
+    steps:
+      - name: Download the reviewed font package blob
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${FONT_BLOB_SHA}" --jq .content \
+            | tr -d '\n' \
+            | base64 --decode > "$ASSET_NAME"
+          echo "$EXPECTED_ASSET_SHA256  $ASSET_NAME" | sha256sum --check
+          unzip -p "$ASSET_NAME" MSGothic_WenQuanYi_cnjp.ttf > font.ttf
+          echo "$EXPECTED_FONT_SHA256  font.ttf" | sha256sum --check
+          unzip -p "$ASSET_NAME" LICENSE-Apache-2.0.txt | grep -q "Apache License"
+
+      - name: Upload and download-verify the optional font asset
+        run: |
+          gh release view "$TARGET_TAG" >/dev/null
+          gh release upload "$TARGET_TAG" "$ASSET_NAME" --clobber
+          mkdir verified
+          gh release download "$TARGET_TAG" --pattern "$ASSET_NAME" --dir verified
+          echo "$EXPECTED_ASSET_SHA256  verified/$ASSET_NAME" | sha256sum --check
+
+      - name: Add the optional font instructions to the release page
+        run: |
+          gh release view "$TARGET_TAG" --json body --jq .body > release-body.md
+          if ! grep -q "nagi-optional-font-v035" release-body.md; then
+            cat >> release-body.md <<'EOF'
+
+          <!-- nagi-optional-font-v035 -->
+          ## 可选字体（建议安装）
+
+          - 下载 **Nagi-0.3.5-optional-font-MSGothic_WenQuanYi-cnjp.zip**，解压后右键其中的 `MSGothic_WenQuanYi_cnjp.ttf`，选择“安装”或“为所有用户安装”。
+          - 此字体可装可不装，不影响 Nagi 的主要功能或翻译流程；安装后可使部分游戏中汉化文本的字体大小与日文原文更加一致，因此建议安装。
+          - 压缩包包含安装说明和 Apache License 2.0 许可证。字体本体 SHA-256：`94ddf86bb662c2f5197cfb7e5ba1ae07525abe587cbd76ca9aa683b6e93ae2ad`。
+          - 可选字体包 SHA-256：`d97cb8dea9070bd57e1cc8fda6a3397903bf2057591c1daf92a098199734b012`。
+          EOF
+          fi
+          gh release edit "$TARGET_TAG" --notes-file release-body.md
