@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from ..gameio.segments import TextSegment
 from ..rag.ingest import normalize_keyword_text, tokenize_keyword_text
 from .models import _canonical_sha256
+from .routes import analyze_corpus_routes
 
 PASSAGE_VERSION = "scene-passages-v2"
 TEXT_KINDS = frozenset({"dialogue", "narration"})
@@ -111,7 +112,7 @@ class Passage:
 
 
 class NarrativeCorpus:
-    def __init__(self, plan):
+    def __init__(self, plan, *, entry_segment_ids=()):
         self.units = {
             unit.segment_id: unit for batch in plan.batches for unit in batch.units
         }
@@ -129,6 +130,7 @@ class NarrativeCorpus:
                 )
         if digest.hexdigest() != plan.segments_sha256:
             raise ValueError("corpus changed while constructing narrative boundaries")
+        self.routes = analyze_corpus_routes(plan, entry_segment_ids=entry_segment_ids)
         for file_key, segments in files.items():
             # This is source order ONLY, not an inferred game-wide route order.
             segments.sort(key=lambda s: (s.source.line_start, s.source.byte_start))
@@ -158,11 +160,14 @@ class NarrativeCorpus:
     def previous(self, unit, limit=4):
         sequence = self.sequences.get(self.groups.get(unit.segment_id), ())
         position = self.positions.get(unit.segment_id)
-        return (
+        previous = (
             tuple(sequence[max(0, position - limit) : position])
             if position is not None
             else ()
         )
+        if self.routes:
+            previous = tuple(u for u in previous if self.routes.classify(u.segment_id, unit.segment_id) == "must")
+        return previous
 
     def adjacent(self, unit):
         sequence = self.sequences.get(self.groups.get(unit.segment_id), ())
@@ -171,6 +176,11 @@ class NarrativeCorpus:
             return None, None
         before = sequence[position - 1] if position else None
         after = sequence[position + 1] if position + 1 < len(sequence) else None
+        if self.routes:
+            if before and self.routes.classify(before.segment_id, unit.segment_id) != "must":
+                before = None
+            if after and self.routes.classify(unit.segment_id, after.segment_id) != "must":
+                after = None
         return before, after
 
     def passages(self, count_tokens, *, target_tokens=320, overlap_turns=2):
@@ -222,6 +232,14 @@ class NarrativeCorpus:
         return tuple(result)
 
     def eligible(self, passage, unit, excluded_ids):
+        if self.routes:
+            if unit.segment_id not in self.routes.bits:
+                return False
+            _, must = self.routes.history_masks(unit.segment_id)
+            return (
+                not set(passage.segment_ids) & excluded_ids
+                and all(self.routes.bits.get(sid, 0) & must for sid in passage.segment_ids)
+            )
         position = self.positions.get(unit.segment_id)
         return (
             position is not None

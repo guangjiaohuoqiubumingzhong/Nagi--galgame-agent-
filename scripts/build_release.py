@@ -179,6 +179,7 @@ def build(portable=False):
             architecture = bundle / "docs/architecture"
             architecture.mkdir()
             shutil.copyfile(source / "docs/architecture/translation-context.md", architecture / "translation-context.md")
+            shutil.copyfile(source / "docs/architecture/route-analysis.md", architecture / "route-analysis.md")
             (bundle / "README.txt").write_text("Nagi " + version + "\n\nDouble-click Nagi.exe.\nRead docs/QUICKSTART.md before configuring your own API.\nStop with Stop Nagi.cmd. Choose writable data with Choose Data Folder.cmd.\n", encoding="utf-8")
             shutil.copytree(source / "release/licenses", bundle / "licenses/supplemental")
             (bundle / "VERSION.txt").write_text(version + "\n", encoding="utf-8")

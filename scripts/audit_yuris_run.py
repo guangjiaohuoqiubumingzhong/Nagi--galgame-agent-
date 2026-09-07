@@ -43,6 +43,8 @@ def audit(workflow_root, *, save_report=False):
         raise ValueError("Translation result count is incomplete")
     requests_root = translated / "api-batches"
     leaf_count = 0
+    from nagi.translation.route_context import prepare_route_context
+    route_context = prepare_route_context(corpus, result, game_dir=state["game_dir"])
     glossary = None
     if result.get("character_glossary_version"):
         from nagi.translation.characters import GLOSSARY_FILE, load_glossary
@@ -56,7 +58,7 @@ def audit(workflow_root, *, save_report=False):
         messages = (
             json.loads(request_path.read_text(encoding="utf-8"))
             if request_path.exists()
-            else batch_messages(batch, glossary)
+            else batch_messages(batch, glossary, route_context)
         )
         payload = json.loads(messages[1]["content"])
         if (

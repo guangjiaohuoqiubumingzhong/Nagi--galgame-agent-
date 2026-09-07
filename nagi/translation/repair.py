@@ -43,7 +43,7 @@ def untranslated_records(units, translations):
     ]
 
 
-def _active_run(root, units, translations, engine, config):
+def _active_run(root, units, translations, engine, config, route_context=None):
     root = Path(root)
     # Keep the run directly below the full result.  Windows game/workflow paths
     # are often already long; another nested audit directory can exceed the
@@ -75,6 +75,7 @@ def _active_run(root, units, translations, engine, config):
                 or plan.get("provider") != config.get("provider")
                 or plan.get("model") != config.get("model")
                 or plan.get("selected_ids") != [unit["id"] for unit in selected]
+                or plan.get("route_context_id") != (route_context.identity if route_context else None)
             ):
                 raise ValueError("查缺补漏断点与当前全文译文或模型不一致")
             return run, selected, plan
@@ -91,6 +92,8 @@ def _active_run(root, units, translations, engine, config):
         "selected_count": len(selected),
         "batch_count": len(list(batches(selected))),
     }
+    if route_context is not None:
+        plan["route_context_id"] = route_context.identity
     save_json(run / "repair-plan.json", plan)
     save_json(active_path, {"schema_version": 1, "run": str(run.relative_to(root))})
     return run, selected, plan
@@ -104,6 +107,7 @@ def repair_text_result(
     *,
     engine,
     glossary=None,
+    route_context=None,
     workers=4,
 ):
     """Retranslate selected records and atomically merge them into a full result."""
@@ -121,7 +125,7 @@ def repair_text_result(
     ):
         raise ValueError("已有全文翻译结果不完整或已改变，不能查缺补漏")
     config = job.model_config or {}
-    run, selected, plan = _active_run(root, units, translations, engine, config)
+    run, selected, plan = _active_run(root, units, translations, engine, config, route_context)
     planned = list(batches(selected))
     requests = run / "api-batches"
     requests.mkdir(exist_ok=True)
@@ -151,6 +155,7 @@ def repair_text_result(
             f"{index:05d}",
             batch,
             glossary=glossary,
+            route_context=route_context,
         )
         with lock:
             repaired.update(translated)

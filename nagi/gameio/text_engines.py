@@ -383,6 +383,7 @@ def extract_game(game, output_root, job, engine):
             "key": key, "source_kind": source_kind,
             "source_relative": source_relative, "internal_path": internal,
             "output_relative": output_relative, "source_sha256": sha256_bytes(data),
+            "text_sha256": sha256_bytes(text.encode("utf-8")),
             "container_sha256": container_hashes[source_relative],
             "encoding": encoding, "text_count": len(spans),
         }

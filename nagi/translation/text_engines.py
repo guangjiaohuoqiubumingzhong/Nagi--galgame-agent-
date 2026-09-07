@@ -37,6 +37,11 @@ def translate(job, corpus, client_factory, engine, *, workers=4):
     }
     plan_path = root / "translation-plan.json"
     previous = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.exists() else None
+    from .route_context import prepare_route_context
+    route_context = prepare_route_context(corpus, previous)
+    if route_context is not None:
+        identity["route_context_id"] = route_context.identity
+        job.update(context_summary=route_context.summary())
     if previous and previous != identity:
         raise ValueError("已保存的翻译计划与当前范围/模型不一致，请新建任务")
     save_json(plan_path, identity)
@@ -54,7 +59,8 @@ def translate(job, corpus, client_factory, engine, *, workers=4):
     def worker(index, batch):
         if abort.is_set() or job.cancel_event.is_set():
             raise InterruptedError()
-        translated = complete_batch(job, client_factory, requests, f"{index:05d}", batch)
+        translated = complete_batch(job, client_factory, requests, f"{index:05d}", batch,
+                                    route_context=route_context)
         with lock:
             combined.update(translated)
             job.update(
@@ -98,6 +104,7 @@ def translate(job, corpus, client_factory, engine, *, workers=4):
 def repair(job, corpus, client_factory, engine, *, workers=4):
     """Run the explicit 查缺补漏 action for a completed full text-engine run."""
     from .repair import repair_text_result
+    from .route_context import prepare_route_context
 
     if job.mode != "full":
         raise ValueError("查缺补漏需要先完成一次全文翻译")
@@ -134,5 +141,6 @@ def repair(job, corpus, client_factory, engine, *, workers=4):
         units,
         client_factory,
         engine=engine,
+        route_context=prepare_route_context(corpus, plan),
         workers=workers,
     )

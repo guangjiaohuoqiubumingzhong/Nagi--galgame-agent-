@@ -14,9 +14,11 @@ def _path(value):
     return value.replace("\\", "/").casefold()
 
 
-def _effective_scripts(corpus):
+def _effective_scripts(corpus, *, expected_segments_sha256=None):
     corpus = Path(corpus)
     raw = (corpus / "segments.jsonl").read_bytes()
+    if expected_segments_sha256 is not None and hashlib.sha256(raw).hexdigest() != expected_segments_sha256:
+        raise unsupported("QLIE 语料与已验证的翻译计划不匹配")
     report = json.loads((corpus / "parse-report.json").read_text(encoding="utf-8"))
     if report["artifacts"]["segments"]["sha256"] != hashlib.sha256(raw).hexdigest():
         raise unsupported("QLIE 语料已改变")

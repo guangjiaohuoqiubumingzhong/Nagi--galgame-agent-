@@ -988,11 +988,35 @@ def build_translate_arg_parser():
     init_parser.add_argument("--json", action="store_true", help="Write content-free run metadata as JSON.")
     for context_parser in (preview_parser, init_parser):
         context_parser.add_argument("--with-context", action="store_true", help="Retrieve bounded local source evidence and adjacent text; no model call.")
+    routes_parser = commands.add_parser("analyze-routes", help="Inspect static route may/must history without model calls.")
+    routes_parser.add_argument("corpus", help="Published QLIE or extracted text-engine corpus directory.")
+    routes_parser.add_argument("--game-dir", help="Original YU-RIS game directory (defaults to extraction manifest).")
+    routes_parser.add_argument("--segment-id", help="Dialogue/narration ID whose incoming history should be inspected.")
+    routes_parser.add_argument("--entry-segment-id", action="append", default=[], help="Explicit entry ID; repeat to analyse all given entries.")
     return parser
 
 
 def run_translate_command(argv):
     args = build_translate_arg_parser().parse_args(argv)
+    if args.translate_command == "analyze-routes":
+        from pathlib import Path
+        from .translation.routes import analyze_corpus_routes
+        if (Path(args.corpus) / "extraction.json").is_file():
+            from .translation.route_context import analyze_extracted_routes
+            analysis, _ = analyze_extracted_routes(args.corpus, game_dir=args.game_dir,
+                                                   entry_ids=args.entry_segment_id)
+        else:
+            plan = build_translation_batch_plan(args.corpus)
+            if plan.status != "ready":
+                raise ValueError("route analysis requires a complete validated corpus")
+            analysis = analyze_corpus_routes(plan, entry_segment_ids=args.entry_segment_id)
+        payload = analysis.summary() if analysis else {"status": "unsupported", "reason": "no_control_flow_adapter"}
+        if analysis:
+            payload["branches"] = list(analysis.program.branches)
+            if args.segment_id:
+                payload["history"] = analysis.history(args.segment_id)
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2))
+        return 0
     prepared = None
     context_config = None
     if getattr(args, "with_context", False):

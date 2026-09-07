@@ -25,7 +25,7 @@ from .translator import (
     build_translation_request,
 )
 
-CONTEXT_VERSION = "translation-context-v2"
+CONTEXT_VERSION = "translation-context-v3"
 DEFAULT_RAG_BUDGET = 3000
 
 
@@ -50,8 +50,17 @@ class TranslationContextConfig:
     semantic_min_score: float = 0.75
     rerank_min_score: float = -4.0
     max_request_bytes: int = 60000
+    route_entry_segment_ids: tuple[str, ...] = ()
 
     def __post_init__(self):
+        entries = self.route_entry_segment_ids
+        if (
+            not isinstance(entries, (tuple, list))
+            or any(not isinstance(s, str) or not s for s in entries)
+            or len(set(entries)) != len(entries)
+        ):
+            raise ValueError("route_entry_segment_ids must contain unique segment IDs")
+        object.__setattr__(self, "route_entry_segment_ids", tuple(entries))
         limits = {
             "rag_budget_chars": (0, 8000),
             "chunk_tokens": (16, 384),
@@ -88,7 +97,9 @@ class TranslationContextConfig:
         return cls(**payload)
 
     def to_dict(self):
-        return asdict(self)
+        payload = asdict(self)
+        payload["route_entry_segment_ids"] = list(self.route_entry_segment_ids)
+        return payload
 
 
 class TranslationContextBuilder:
@@ -118,7 +129,7 @@ class TranslationContextBuilder:
         self.config = TranslationContextConfig.from_dict(
             config.to_dict() if isinstance(config, TranslationContextConfig) else config
         )
-        self.narrative = NarrativeCorpus(full_plan)
+        self.narrative = NarrativeCorpus(full_plan, entry_segment_ids=self.config.route_entry_segment_ids)
         self.units = self.narrative.units
         self.target_language = target_language
         self.embedder = embedder
@@ -137,7 +148,7 @@ class TranslationContextBuilder:
             target_tokens=self.config.chunk_tokens,
             overlap_turns=self.config.overlap_turns,
         )
-        self.index_id = "tctx_v2_" + _canonical_sha256(
+        self.index_id = "tctx_v3_" + _canonical_sha256(
             {
                 "version": CONTEXT_VERSION,
                 "passages": PASSAGE_VERSION,
@@ -147,6 +158,7 @@ class TranslationContextBuilder:
                 "reranker": reranker.identity if reranker else None,
                 "chunks": [p.chunk_id for p in self.passages],
                 "target_language": target_language,
+                "route_analysis": self.narrative.routes.summary() if self.narrative.routes else None,
                 **({"character_glossary_version": character_glossary.version} if character_glossary else {}),
             }
         )
@@ -171,7 +183,10 @@ class TranslationContextBuilder:
             "retrieval_mode": "hybrid" if self.embedder else "bm25",
             "embedding_model": self.embedder.identity if self.embedder else None,
             "reranker_model": self.reranker.identity if self.reranker else None,
-            "boundary_policy": "confirmed-linear-prefix-only",
+            "boundary_policy": "must-history-only" if self.narrative.routes else "confirmed-linear-prefix-only",
+            "route_analysis": self.narrative.routes.summary() if self.narrative.routes else {
+                "status": "unsupported", "reason": "no_control_flow_adapter",
+            },
             "chunk_count": len(self.passages),
             "rag_budget_chars_per_batch": self.config.rag_budget_chars,
             "cache_hits": self.cache.hits,
@@ -270,7 +285,7 @@ class TranslationContextBuilder:
                 "chunk_id": passage.chunk_id,
                 "source_text": passage.text,
                 "scene": passage.scene,
-                "history": "confirmed_prefix",
+                "history": "all_paths" if self.narrative.routes else "confirmed_prefix",
                 "retrieved_by": row["routes"],
                 "passage_segment_ids": list(passage.segment_ids),
             }

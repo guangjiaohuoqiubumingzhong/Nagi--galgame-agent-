@@ -144,7 +144,7 @@ def test_first_pilot_cannot_retrieve_future_even_though_full_corpus_indexed(tmp_
     before = {p: p.read_bytes() for p in root.iterdir()}
     summary = {}
     plan, requests, _ = prepare(root, limit=1, summary=summary)
-    assert plan.config.rag_index_id.startswith("tctx_v2_")
+    assert plan.config.rag_index_id.startswith("tctx_v3_")
     assert summary["chunk_count"] > 0
     assert summary["retrieval_mode"] == "bm25"
     assert requests[0].units[0].adjacent_context.next_text == segments[1].source_text
@@ -309,12 +309,14 @@ def test_pool_and_references_fit_whole_batch_budget(tmp_path, budget):
         assert len(pool) <= 4 and all(len(ids) <= 2 for ids in references)
 
 
-def test_shared_evidence_serializes_once_and_each_unit_references_it(tmp_path):
+@pytest.mark.parametrize("index_prefix", ["tctx_v2_", "tctx_v3_"])
+def test_shared_evidence_serializes_once_and_each_unit_references_it(tmp_path, index_prefix):
     from nagi.translation.models import TranslationBatch
 
     root, _ = corpus_fixture(tmp_path)
     full = build_translation_batch_plan(root)
     builder = TranslationContextBuilder(full, {"chunk_tokens": 80})
+    builder.index_id = index_prefix + builder.index_id.removeprefix("tctx_v3_")
     units = list(builder.units.values())
     batch = TranslationBatch("tb_v1_test", 1, "planned", tuple(units[5:7]))
     row = {"passage": builder.passages[0], "score": 1.0, "routes": ["bm25"]}
@@ -322,6 +324,7 @@ def test_shared_evidence_serializes_once_and_each_unit_references_it(tmp_path):
     request = builder.build_request(batch, model_id="fake", prompt_version="v1")
     payload = json.loads(request.messages[1]["content"].split("REQUEST_JSON:", 1)[1])
     assert len(payload["rag_evidence_pool"]) == 1
+    assert ("For route-aware evidence" in request.messages[0]["content"]) == (index_prefix == "tctx_v3_")
     assert (
         payload["units"][0]["rag_evidence_ids"]
         == payload["units"][1]["rag_evidence_ids"]
@@ -491,7 +494,7 @@ def test_cli_context_preview_remains_offline_and_read_only(tmp_path, capsys):
         == 0
     )
     payload = json.loads(capsys.readouterr().out)
-    assert payload["rag_index_id"].startswith("tctx_v2_")
+    assert payload["rag_index_id"].startswith("tctx_v3_")
     assert not payload["units"][0][
         "rag_evidence"
     ]  # No future evidence for the first line.

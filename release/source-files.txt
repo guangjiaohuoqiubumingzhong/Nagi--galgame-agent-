@@ -25,6 +25,7 @@ docs/architecture/character-glossary.md
 docs/architecture/engine-integration-rules.md
 docs/architecture/messages.md
 docs/architecture/opening-selection.md
+docs/architecture/route-analysis.md
 docs/architecture/translation-context.md
 docs/mcp.md
 docs/release-checklist.md
@@ -80,6 +81,7 @@ nagi/gameio/qlie/repack.py
 nagi/gameio/qlie/corpus.py
 nagi/gameio/qlie/detector.py
 nagi/gameio/qlie/exporter.py
+nagi/gameio/qlie/flow.py
 nagi/gameio/qlie/opening.py
 nagi/gameio/qlie/payload.py
 nagi/gameio/qlie/pe.py
@@ -131,6 +133,13 @@ nagi/translation/passages.py
 nagi/translation/patch.py
 nagi/translation/planner.py
 nagi/translation/repair.py
+nagi/translation/routes.py
+nagi/gameio/control_flow.py
+nagi/gameio/renpy_flow.py
+nagi/gameio/kag_flow.py
+nagi/gameio/yuris_flow.py
+nagi/translation/route_context.py
+tests/test_engine_routes.py
 nagi/translation/terminology.py
 nagi/translation/tool.py
 nagi/translation/text_engines.py
@@ -215,6 +224,7 @@ tests/test_text_engine_adapters.py
 tests/test_tool_executor.py
 tests/test_tools.py
 tests/test_translation_context.py
+tests/test_translation_routes.py
 tests/test_translation_patch.py
 tests/test_translation_pipeline.py
 tests/test_translation_planner.py
@@ -252,3 +262,4 @@ release/notes-0.3.1.md
 release/notes-0.3.2.md
 release/notes-0.3.5.md
 release/notes-0.4.0.md
+release/notes-0.5.0.md
