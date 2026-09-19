@@ -104,9 +104,19 @@ def analyze_extracted_routes(corpus, *, game_dir=None, entry_ids=()):
 
 
 class RouteContext:
-    def __init__(self, analysis, units):
+    def __init__(self, analysis, units, *, embedder=None, reranker=None,
+                 cache=None, config=None, legacy=False, progress=None):
+        from ..rag.semantic import RetrievalCache
+        from .context import TranslationContextConfig
+
         self.analysis = analysis
         self.units = {u["id"]: u for u in units}
+        self.legacy = legacy
+        self.config = config or TranslationContextConfig()
+        self.embedder = embedder
+        self.reranker = reranker
+        self.cache = cache or RetrievalCache()
+        self.vectors = {}
         self.identity = digest(
             {
                 "policy": "must-bm25-v1",
@@ -115,19 +125,47 @@ class RouteContext:
                 "units": units,
             }
         )
+        if not legacy:
+            self.identity = "route_hybrid_v1_" + digest({
+                "source": self.identity,
+                "config": self.config.to_dict(),
+                "embedding": embedder.identity if embedder else None,
+                "reranker": reranker.identity if reranker else None,
+            })
+        # Whole records stay intact. Oversized records retain the lexical route
+        # rather than being silently truncated by the neural tokenizer.
+        if embedder and self.config.rag_budget_chars and not legacy:
+            passages = [u for u in units if u.get("command", "WORD") == "WORD"
+                        and embedder.count_tokens(u["text"]) <= self.config.chunk_tokens]
+            for offset in range(0, len(passages), 32):
+                if progress:
+                    progress(f"本地语义索引：{offset}/{len(passages)} 条文本")
+                subset = passages[offset:offset + 32]
+                vectors = self.cache.embeddings(
+                    embedder, [u["text"] for u in subset], policy="route-records-v1",
+                )
+                self.vectors.update((u["id"], v) for u, v in zip(subset, vectors))
 
     def summary(self):
         return {
             "boundary_policy": "must-history-only",
             "route_context_id": self.identity,
             "route_analysis": self.analysis.summary(),
+            "retrieval_mode": "hybrid" if self.embedder and not self.legacy else "bm25",
+            "embedding_model": self.embedder.identity if self.embedder else None,
+            "reranker_model": self.reranker.identity if self.reranker else None,
+            "rag_budget_chars_per_batch": 3000 if self.legacy else self.config.rag_budget_chars,
+            "semantic_record_count": len(self.vectors),
         }
 
     def payload(self, batch):
         from .passages import bm25_candidates
+        from .retrieval import retrieve_history
 
         excluded = {u["id"] for u in batch}
         pool, references = {}, {}
+        if not self.legacy and not self.config.rag_budget_chars:
+            return {"evidence_pool": [], "references": {}}
         for unit in batch:
             _, must = self.analysis.history_masks(unit["id"])
             candidates = [
@@ -137,7 +175,17 @@ class RouteContext:
                 and sid not in excluded
                 and self.units[sid].get("command", "WORD") == "WORD"
             ]
-            for candidate, _ in bm25_candidates(candidates, unit["text"], (), limit=2):
+            if self.legacy:
+                selected = [p for p, _ in bm25_candidates(candidates, unit["text"], (), limit=2)]
+            else:
+                embedder = self.embedder
+                if embedder and embedder.count_tokens(unit["text"]) > self.config.query_tokens:
+                    embedder = None
+                selected = [row["passage"] for row in retrieve_history(
+                    unit["text"], candidates, config=self.config, embedder=embedder,
+                    reranker=self.reranker, cache=self.cache, vectors=self.vectors,
+                )] if candidates else []
+            for candidate in selected:
                 sid = candidate.chunk_id
                 evidence = {"id": sid, "text": candidate.text, "history": "all_paths"}
                 proposed = dict(pool)
@@ -146,19 +194,51 @@ class RouteContext:
                 refs.setdefault(unit["id"], []).append(sid)
                 payload = {"evidence_pool": list(proposed.values()), "references": refs}
                 if (
-                    len(proposed) <= 4
-                    and len(json.dumps(payload, ensure_ascii=False)) <= 3000
+                    len(proposed) <= (4 if self.legacy else self.config.batch_max_chunks)
+                    and len(json.dumps(payload, ensure_ascii=False))
+                    <= (3000 if self.legacy else self.config.rag_budget_chars)
                 ):
                     pool, references = proposed, refs
         return {"evidence_pool": list(pool.values()), "references": references}
 
 
-def prepare_route_context(corpus, previous, *, game_dir=None):
+def prepare_route_context(corpus, previous, *, game_dir=None, job=None):
     # Never alter messages for previously paid tasks created before this feature.
     if previous is not None and "route_context_id" not in previous:
         return None
-    analysis, units = analyze_extracted_routes(corpus, game_dir=game_dir)
-    context = RouteContext(analysis, units)
+    from ..paths import state_root
+    from ..rag.semantic import RetrievalCache, local_models
+    from .context import TranslationContextConfig
+
+    legacy = previous is not None and not previous["route_context_id"].startswith("route_hybrid_v1_")
+    config = getattr(job, "context_config", None) or TranslationContextConfig()
+    analysis, units = analyze_extracted_routes(
+        corpus, game_dir=game_dir,
+        entry_ids=() if legacy else config.route_entry_segment_ids,
+    )
+    embedder, reranker, missing = None, None, ()
+    if not legacy:
+        models = getattr(job, "retrieval_models", None)
+        if models is None:
+            models = local_models()
+            if job is not None:
+                job.retrieval_models = models
+        embedder, reranker, missing = models
+
+    def progress(message):
+        if job is not None:
+            if job.cancel_event.is_set():
+                raise InterruptedError("translation context cancelled")
+            job.update(message=message)
+
+    context = RouteContext(
+        analysis, units, embedder=embedder, reranker=reranker, config=config,
+        legacy=legacy, progress=progress,
+        cache=RetrievalCache(state_root() / "rag-cache" / "retrieval.sqlite3")
+        if embedder or reranker else None,
+    )
     if previous and previous["route_context_id"] != context.identity:
         raise ValueError("Saved route context differs; start a new translation run")
+    if job is not None:
+        job.update(context_summary={**context.summary(), "missing_models": list(missing)})
     return context

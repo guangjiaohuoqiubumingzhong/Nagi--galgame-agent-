@@ -255,10 +255,9 @@ def translate(job, corpus, client_factory, *, workers=4):
             identity["opening_selection"] = opening
     name_fields = {"character_glossary_version", "character_catalog_sha256"}
     from .route_context import prepare_route_context
-    route_context = prepare_route_context(corpus, previous, game_dir=job.game_dir)
+    route_context = prepare_route_context(corpus, previous, game_dir=job.game_dir, job=job)
     if route_context is not None:
         identity["route_context_id"] = route_context.identity
-        job.update(context_summary=route_context.summary())
     if previous and {k: v for k, v in previous.items() if k not in name_fields} != identity:
         raise ValueError("Saved translation plan differs; start a new translation run")
     glossary = None
@@ -408,6 +407,6 @@ def repair(job, corpus, client_factory, *, workers=4):
         client_factory,
         engine=ENGINE,
         glossary=glossary,
-        route_context=prepare_route_context(corpus, plan, game_dir=job.game_dir),
+        route_context=prepare_route_context(corpus, plan, game_dir=job.game_dir, job=job),
         workers=workers,
     )

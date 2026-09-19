@@ -165,7 +165,8 @@ def test_script_only_mutation_invalidates_routes(tmp_path):
         analyze_extracted_routes(corpus)
 
 
-def test_actual_translation_messages_use_only_must_and_resume(tmp_path, monkeypatch):
+@pytest.mark.parametrize("hybrid", [False, True])
+def test_actual_translation_messages_use_only_must_and_resume(tmp_path, monkeypatch, hybrid):
     from nagi.translation import text_engines
     from nagi.translation.yuris import batches
 
@@ -205,7 +206,12 @@ def test_actual_translation_messages_use_only_must_and_resume(tmp_path, monkeypa
         mode="full",
         output_root=str(tmp_path / "result"),
     )
+    if hybrid:
+        from test_translation_context import FakeEmbedder
+
+        job.retrieval_models = (FakeEmbedder(), None, ())
     text_engines.translate(job, corpus, Client, "renpy", workers=1)
+    assert job.context_summary["retrieval_mode"] == ("hybrid" if hybrid else "bm25")
     target = next(p for p in captured if p["texts"][0]["id"] == ids["共通の記憶の続き"])
     assert target["route_context"]["references"][ids["共通の記憶の続き"]] == [
         ids["共通の記憶"]
@@ -304,6 +310,7 @@ def test_yuris_bytecode_diamond_and_loop():
 
 def test_yuris_real_archive_cross_script_labels():
     from test_opening_selection import story_archive
+
     from nagi.gameio.yuris_flow import build_program
 
     entries = yuris.archive_entries(story_archive(count=9, opening_command="GOSUB"))
@@ -481,9 +488,9 @@ def test_text_engine_cli_report_has_history_without_source_text(tmp_path, capsys
 
 
 def test_legacy_text_translation_preserves_paid_request(tmp_path):
+    from nagi.translation.route_context import digest
     from nagi.translation.text_engines import translate
     from nagi.translation.yuris import batch_messages, batches
-    from nagi.translation.route_context import digest
 
     _, _, corpus, units = analyse(
         tmp_path, "renpy", {"game/script.rpy": 'label start:\n    "本文"\n    return\n'}
@@ -518,3 +525,105 @@ def test_legacy_text_translation_preserves_paid_request(tmp_path):
         digest(json.loads((root / "translation-plan.json").read_text(encoding="utf-8")))
         == before
     )
+
+
+@pytest.mark.parametrize("engine", ["renpy", "kirikiri", "tyranoscript", "yuris-479"])
+@pytest.mark.parametrize("rerank", [False, True])
+def test_all_engines_hybrid_evidence_respects_routes_and_cache(tmp_path, engine, rerank):
+    from test_translation_context import FakeEmbedder, FakeReranker
+
+    from nagi.rag.semantic import RetrievalCache
+    from nagi.translation.yuris import batch_messages
+
+    common = "silver key library gate"
+    left, right = "silver key left", "silver key right"
+    target = "promise remembered" if rerank else "silver key remembered"
+    if engine == "yuris-479":
+        analysis, ids = yuris_program([
+            ("WORD", common), ("IF", None), ("WORD", left),
+            ("ELSE", None), ("WORD", right), ("IFEND", None),
+            ("WORD", target), ("END", None),
+        ])
+        units = [{"id": sid, "text": text, "command": "WORD"}
+                 for text, sid in ids.items()]
+    else:
+        scripts = {"game/script.rpy": (
+            f'label start:\n    "{common}"\n    if route:\n        "{left}"\n'
+            f'    else:\n        "{right}"\n    "{target}"\n    return\n'
+        )} if engine == "renpy" else {
+            ("data/scenario/first.ks" if engine == "tyranoscript" else "first.ks"):
+            f'{common}\n[if exp="f.route"]\n{left}\n[else]\n{right}\n[endif]\n{target}\n'
+        }
+        analysis, ids, _, units = analyse(tmp_path, engine, scripts)
+    embedder, reranker = FakeEmbedder(), FakeReranker()
+    context = RouteContext(analysis, units, embedder=embedder, reranker=reranker if rerank else None,
+                           cache=RetrievalCache(tmp_path / "vectors.sqlite3"))
+    batch = [{"id": ids[target], "text": target}]
+    messages = batch_messages(batch, route_context=context)
+    payload = json.loads(messages[-1]["content"])["route_context"]
+    assert payload["references"] == {ids[target]: [ids[common]]}
+    assert {e["id"] for e in payload["evidence_pool"]} == {ids[common]}
+    assert reranker.calls == ([(target, [common])] if rerank else [])
+    assert any(query for query, _ in embedder.calls)
+    calls = len(embedder.calls), len(reranker.calls)
+    assert batch_messages(batch, route_context=context) == messages
+    assert (len(embedder.calls), len(reranker.calls)) == calls
+    assert context.summary()["retrieval_mode"] == "hybrid"
+    assert len(json.dumps(payload, ensure_ascii=False)) <= 3000
+    # Even a semantic match cannot retrieve another target from the same batch.
+    assert not context.payload([batch[0], {"id": ids[common], "text": common}])["evidence_pool"]
+
+
+def test_hybrid_resume_identity_and_legacy_bm25(tmp_path, monkeypatch):
+    from test_translation_context import FakeEmbedder
+
+    from nagi.rag import semantic
+    from nagi.translation.context import TranslationContextConfig
+    from nagi.translation.route_context import prepare_route_context
+
+    analysis, _, corpus, units = analyse(tmp_path, "renpy", {
+        "game/script.rpy": 'label start:\n    "silver key"\n    "silver key remembered"\n    return\n'
+    })
+    monkeypatch.setenv("NAGI_DATA_DIR", str(tmp_path / "state"))
+    job = TranslationJob("rag", str(tmp_path / "game"), "full", str(tmp_path / "result"))
+    job.retrieval_models = (FakeEmbedder(), None, ())
+    context = prepare_route_context(corpus, None, job=job)
+    previous = {"route_context_id": context.identity}
+    assert prepare_route_context(corpus, previous, job=job).identity == context.identity
+    job.context_config = TranslationContextConfig(semantic_min_score=0.9)
+    with pytest.raises(ValueError, match="Saved route context differs"):
+        prepare_route_context(corpus, previous, job=job)
+    job.context_config = TranslationContextConfig()
+    job.retrieval_models = (None, None, ())
+    with pytest.raises(ValueError, match="Saved route context differs"):
+        prepare_route_context(corpus, previous, job=job)
+
+    legacy = RouteContext(analysis, units, legacy=True)
+    def no_models():
+        raise AssertionError("legacy runs must never load new models")
+    monkeypatch.setattr(semantic, "local_models", no_models)
+    job.retrieval_models = None
+    resumed = prepare_route_context(corpus, {"route_context_id": legacy.identity}, job=job)
+    assert resumed.identity == legacy.identity
+    assert resumed.payload([units[-1]]) == legacy.payload([units[-1]])
+    assert resumed.summary()["retrieval_mode"] == "bm25"
+    assert prepare_route_context(corpus, {}, job=job) is None
+
+
+def test_route_hybrid_bounds_and_disabled_budget(tmp_path):
+    from test_translation_context import FakeEmbedder
+
+    from nagi.translation.context import TranslationContextConfig
+
+    long_text = "silver key " * 200
+    analysis, _, _, units = analyse(tmp_path, "renpy", {
+        "game/script.rpy": f'label start:\n    "{long_text}"\n    "silver key remembered"\n    return\n'
+    })
+    embedder = FakeEmbedder()
+    context = RouteContext(analysis, units, embedder=embedder)
+    assert all(long_text not in texts for _, texts in embedder.calls)
+    assert context.payload([units[-1]])["evidence_pool"][0]["text"] == long_text
+    disabled = RouteContext(analysis, units, embedder=embedder,
+                            config=TranslationContextConfig(rag_budget_chars=0))
+    assert disabled.vectors == {}
+    assert disabled.payload([units[-1]]) == {"evidence_pool": [], "references": {}}

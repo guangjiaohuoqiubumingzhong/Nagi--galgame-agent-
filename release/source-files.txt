@@ -27,6 +27,7 @@ docs/architecture/messages.md
 docs/architecture/opening-selection.md
 docs/architecture/route-analysis.md
 docs/architecture/translation-context.md
+docs/architecture/galgame-skill-feasibility.md
 docs/mcp.md
 docs/release-checklist.md
 docs/translation-storage.md
@@ -139,6 +140,7 @@ nagi/gameio/renpy_flow.py
 nagi/gameio/kag_flow.py
 nagi/gameio/yuris_flow.py
 nagi/translation/route_context.py
+nagi/translation/retrieval.py
 tests/test_engine_routes.py
 nagi/translation/terminology.py
 nagi/translation/tool.py
@@ -263,3 +265,4 @@ release/notes-0.3.2.md
 release/notes-0.3.5.md
 release/notes-0.4.0.md
 release/notes-0.5.0.md
+release/notes-0.5.1.md

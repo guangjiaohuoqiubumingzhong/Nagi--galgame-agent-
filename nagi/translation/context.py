@@ -11,12 +11,10 @@ from .models import RAGEvidenceReference, _canonical_sha256
 from .passages import (
     PASSAGE_VERSION,
     NarrativeCorpus,
-    bm25_candidates,
     display_text,
-    keywords,
-    lexical_relevant,
 )
 from .planner import build_translation_batch_plan
+from .retrieval import retrieve_history
 from .terminology import TerminologySnapshot
 from .translator import (
     RAGPromptEvidence,
@@ -223,58 +221,11 @@ class TranslationContextBuilder:
         ]
         if not candidates:
             return []
-        lexical = bm25_candidates(
-            candidates, query, self.narrative.speakers, self.config.bm25_k
+        return retrieve_history(
+            query, candidates, config=self.config, embedder=self.embedder,
+            reranker=self.reranker, cache=self.cache, vectors=self.vectors,
+            speakers=self.narrative.speakers,
         )
-        vector = []
-        if self.embedder:
-            embedding = self.cache.embeddings(self.embedder, [query], query=True)[0]
-            for passage in candidates:
-                stored = self.vectors[passage.chunk_id]
-                if len(embedding) != len(stored):
-                    raise ValueError("query and passage embedding dimensions differ")
-                score = sum(a * b for a, b in zip(embedding, stored))
-                if score >= self.config.semantic_min_score:
-                    vector.append((passage, score))
-            vector.sort(key=lambda row: (-row[1], row[0].chunk_id))
-            vector = vector[: self.config.vector_k]
-        rows = {}
-        for route, results in (("bm25", lexical), ("vector", vector)):
-            for rank, (passage, _) in enumerate(results, 1):
-                row = rows.setdefault(
-                    passage.chunk_id, {"passage": passage, "rrf": 0.0, "routes": []}
-                )
-                row["rrf"] += 1 / (60 + rank)
-                row["routes"].append(route)
-        ranked = sorted(
-            rows.values(), key=lambda r: (-r["rrf"], r["passage"].chunk_id)
-        )[: self.config.rerank_k]
-        if self.reranker and ranked:
-            ranked = [
-                row
-                for row in ranked
-                if self.reranker.fits_pair(query, row["passage"].text)
-            ]
-            scores = self.cache.scores(
-                self.reranker, query, [r["passage"].text for r in ranked]
-            )
-            for row, score in zip(ranked, scores):
-                row["score"] = score
-            ranked = [
-                row for row in ranked if row["score"] >= self.config.rerank_min_score
-            ]
-            ranked.sort(key=lambda r: (-r["score"], -r["rrf"], r["passage"].chunk_id))
-        else:
-            # Without reranking, semantic-only matches require lexical support.
-            ranked = [
-                row
-                for row in ranked
-                if "bm25" in row["routes"]
-                or lexical_relevant(keywords(query), keywords(row["passage"].text))
-            ]
-            for row in ranked:
-                row["score"] = row["rrf"]
-        return ranked[: self.config.per_query_k]
 
     def _evidence(self, row):
         passage = row["passage"]

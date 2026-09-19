@@ -38,10 +38,9 @@ def translate(job, corpus, client_factory, engine, *, workers=4):
     plan_path = root / "translation-plan.json"
     previous = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.exists() else None
     from .route_context import prepare_route_context
-    route_context = prepare_route_context(corpus, previous)
+    route_context = prepare_route_context(corpus, previous, job=job)
     if route_context is not None:
         identity["route_context_id"] = route_context.identity
-        job.update(context_summary=route_context.summary())
     if previous and previous != identity:
         raise ValueError("已保存的翻译计划与当前范围/模型不一致，请新建任务")
     save_json(plan_path, identity)
@@ -141,6 +140,6 @@ def repair(job, corpus, client_factory, engine, *, workers=4):
         units,
         client_factory,
         engine=engine,
-        route_context=prepare_route_context(corpus, plan),
+        route_context=prepare_route_context(corpus, plan, job=job),
         workers=workers,
     )

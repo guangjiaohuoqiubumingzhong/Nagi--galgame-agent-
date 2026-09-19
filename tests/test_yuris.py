@@ -156,9 +156,10 @@ def test_patch_preserves_control_flow_and_writes_chinese_without_loss():
         yuris.patched_archive(original, {units[0]["id"]: "不能默默跳过"})
 
 
+@pytest.mark.parametrize("hybrid", [False, True])
 @pytest.mark.parametrize("choice_expression", [False, True])
 def test_every_extracted_record_reaches_api_and_resume_does_not_repay(
-    tmp_path, choice_expression
+    tmp_path, choice_expression, hybrid
 ):
     game, output = tmp_path / "game", tmp_path / "extract"
     (game / "pac").mkdir(parents=True)
@@ -173,6 +174,10 @@ def test_every_extracted_record_reaches_api_and_resume_does_not_repay(
         str(tmp_path / "translated"),
         model_config={"provider": "fake", "model": "fake"},
     )
+    if hybrid:
+        from test_translation_context import FakeEmbedder
+
+        job.retrieval_models = (FakeEmbedder(), None, ())
     _, corpus = yuris.extract_game(game, output, job)
     received = []
 
@@ -191,6 +196,7 @@ def test_every_extracted_record_reaches_api_and_resume_does_not_repay(
             )
 
     translate(job, corpus, Client, workers=2)
+    assert job.context_summary["retrieval_mode"] == ("hybrid" if hybrid else "bm25")
     expected = json.loads((corpus / "texts.json").read_text(encoding="utf-8"))
     assert sorted(received, key=lambda row: row["id"]) == sorted(
         [{"id": row["id"], "text": row["text"]} for row in expected],
